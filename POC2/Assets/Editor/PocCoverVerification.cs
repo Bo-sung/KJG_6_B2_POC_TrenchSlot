@@ -41,7 +41,7 @@ public static class PocCoverVerification
             "saved Game references persisted baked NavMesh data");
         var wave = UnityEngine.Object.FindFirstObjectByType<WaveController>();
         var so = new SerializedObject(wave);
-        Check(so.FindProperty("enemyPrefab").objectReferenceValue != null && so.FindProperty("spawnPoints").arraySize == 2,
+        Check(so.FindProperty("enemyPrefab").objectReferenceValue != null && so.FindProperty("spawnPoints").arraySize >= 2,
             "saved wave prefab and both spawn references preserved");
         foreach (var name in new[] { "SpawnLeft", "SpawnRight" })
         {

@@ -6,5 +6,10 @@
   "waveClearBonusBase": 100,
   "waveClearBonusPerWave": 10,
   "intermissionSeconds": 30,
-  "interactDistance": 4
+  "interactDistance": 4,
+  "crouchHeightRatio": 0.55,
+  "crouchSpeedRatio": 0.5,
+  "crouchCameraSmoothSeconds": 0.12,
+  "damageDirectionHoldSeconds": 0.2,
+  "damageDirectionFadeSeconds": 0.8
 }

@@ -16,4 +16,10 @@ public sealed class GameConfigData
     public float intermissionSeconds;
     // 슬롯 상호작용 거리(m).
     public float interactDistance;
+    // Provisional crouch / presentation tuning; defaults preserve older table callers.
+    public float crouchHeightRatio = 0.55f;
+    public float crouchSpeedRatio = 0.5f;
+    public float crouchCameraSmoothSeconds = 0.12f;
+    public float damageDirectionHoldSeconds = 0.2f;
+    public float damageDirectionFadeSeconds = 0.8f;
 }

@@ -440,3 +440,14 @@
 - 2026-10-29: 적 원거리 무기 진행 최신 지시(1~3 머스켓 / 4~9 WWI 소총 / 10~ WWII 소총) 반영 — §1-5, 결정 #26. 웨이브 표 `enemyWeapon` + `EnemyWeaponData.json` 신설
 - 2026-10-29: 사격·피격 피드백 구현(§1-6, 결정 #27). 공개 레퍼런스 무기 수치 조사 기록(미확정). 무기 테이블 `status: provisional` 표기
 - 2026-10-29: HUD·전투·상점 폴리싱 구현(§1-7, 결정 #28). 확정 적중 마커·피해 점멸·저체력·재장전 %·빈 탄창 문구, 상점 잔액 갱신·회복 칸 잠금·게임 오버 커서 정리. 피드백 연결 검증 28/28 PASS(격리 복사본)
+
+## 9. 이번 통합 작업 규칙 요약 (provisional · 미확정 수치 유지)
+
+- 원본 슬롯 자산: 원본 프로젝트 Assets/Resources/Sound/SFX/Pachinko 출처 경로 기준 해시로 확인. 추출 자산 읽기 전용 보존.
+- 사운드 매핑(원본 SoundManager.prefab의 SlotMachineSound 기준, 원본 .meta GUID 그대로 복사): LeverPull→Pachinko-lever.wav, ReelSpin→Pachinko-spin1.wav(원본 _rotationClip), ReelStop→Pachinko-slot.mp3, Payout→Pachinko-money.mp3, Fail→Pachinko-fail.mp3, NearMiss→Pachinko-fail.mp3(원본엔 니어미스 전용음 없음). destroy·spin.mp3는 import만 하고 참조 없음.
+- 저장된 Game.unity 통합(2026-10-29): `PocGameSceneIntegration.WireAndVerify`가 기존 선택적 저작(PlayerFeedback·WeaponDrop WireSavedGame, AuthorAheadSpawnPoints)과 슬롯 큐를 적용하고 검증한다(스폰 6, 깨진 참조 0, HUD 웅크리기·피격 방향, 픽업·무기 모델, 슬롯 릴 3·레버·지급 파티클). 원본 슬롯은 책상용 크기(약 0.78m)라 씬 인스턴스의 Model만 2.5배 오버라이드(프리팹·콜라이더·NavMesh 변경 없음). 격리 복사본 batch: WireAndVerify exit 0, RunPlayModeSmoke exit 0, `RenderSlotShot` 편집 모드 렌더에서 슬롯 비어 있지 않음. 메타: `Assets/Art/SlotMachineOriginal.meta` 폴더 메타 반영(누락 meta 없음), Pachinko 음원 7개·meta 7개는 원본과 바이트 동일. 음원 재생은 실제로 청취 확인하지 않음.
+- 총구 LOS 방어: EnemyShotOrigin(barrel bounds 일치 보장)와 ClearSegment 어깨→총신 축 스윕으로 긴 머스켓 배럴이 벽을 뚫지 않도록 함. 근접 러셔 무무장 유지(#26 era 경계).
+- 스폰 앵커: SpawnPoints 두 원문 + FacingAnchor(-26,-12)(26,−12)(-12,+12)(+12,+12) 추가 → 총 6개 이상 유효 NavMesh reachable 체크 통과 중 (≥6 가드 유지됨).
+- 바닥 무기: purchase transactional drop 시 outgoing Ammo 스냅샷 보관, 구매 실패 시 소지금·장착 변경 없음; 사망 Retry 후 floor cleanup 진행형 웨이브 회복·슬롯 지급 유지.
+- 패드 공유 바인딩: `<Gamepad>/buttonWest`가 Player/Reload & Player/Pickup에 공존하나 Context 우선 주움 판정(교차 시선 위 유효한 픽업이면 그쪽 Swap 실행, 같은 프레임 양쪽 모두 Reload 금지, 키보드 R은 그대로 R=Reload 독립 동작). Ctrl/C/B는 crouch East+LeftCtrl로 유지되며 C로 분리.
+- 제한: marqueeGlow는 원본 마키 부재로 비워둠, FBX가 아닌 authored primitives임. 오디오 visual rendering·Play 모드 전체 화면 확인은 자동화 미실시라 수동 검증 대기.

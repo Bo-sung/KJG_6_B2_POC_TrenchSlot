@@ -23,7 +23,18 @@ public sealed class WeaponData
         public bool startOwned;
     }
 
+    // 떨어뜨린 무기가 놓일 자리. 플레이어 발밑 기준 거리(m)와 자리 확보 크기(m)다.
+    [Serializable]
+    public sealed class DropSettings
+    {
+        public float minDistance;
+        public float maxDistance;
+        public float clearanceRadius;
+        public float clearanceHeight;
+    }
+
     // 수치 확정 상태. "provisional"이면 임시값이며 공개 레퍼런스 기준 조율 전이다(기획노트 §1-5·§1-6).
     public string status;
+    public DropSettings drop = new DropSettings();
     public Entry[] weapons = Array.Empty<Entry>();
 }

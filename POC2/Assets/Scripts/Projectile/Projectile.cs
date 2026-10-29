@@ -42,6 +42,7 @@ public sealed class Projectile : MonoBehaviour
 
     private Shot shot;
     private Vector3 direction;
+    private Vector3 shotOrigin;
     private Transform owner;
     private LayerMask mask;
     private float traveled;
@@ -58,6 +59,7 @@ public sealed class Projectile : MonoBehaviour
     public void Launch(Shot _shot, Vector3 _origin, Vector3 _direction, LayerMask _mask, Transform _owner)
     {
         shot = _shot;
+        shotOrigin = _origin;
         direction = _direction.normalized;
         mask = _mask;
         owner = _owner;
@@ -155,7 +157,7 @@ public sealed class Projectile : MonoBehaviour
                 {
                     if (player.IsAlive)
                     {
-                        player.ApplyDamage(shot.damage);
+                        player.ApplyDamage(shot.damage, shotOrigin);
                     }
                     Resolve(hit, false, false);
                     return true;

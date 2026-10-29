@@ -10,9 +10,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     // 피격 반응: 몸이 잠깐 흰색으로 번쩍인다. 처치 시에는 앞으로 쓰러진다.
     private const float HIT_FLASH_SECONDS = 0.08f;
     private const float FALL_ANGLE = 80f;
-    // 발사 기준 높이(총구 모델이 없을 때)와 조준 높이(플레이어 몸통 중심). 발사체는 이 점을 향해 날아간다.
+    // 총구가 없는 레거시 프리팹만 쓰는 기하학 폴백. 조준은 실제 CharacterController 중심을 쓴다.
     private const float FALLBACK_MUZZLE_HEIGHT = 1.4f;
-    private const float TARGET_CENTER_HEIGHT = 1.0f;
     // 탄이 막히는 대상: 지형·엄폐물·플레이어. 같은 편 적은 Projectile이 통과시키고, 트리거는 스윕에서 제외된다.
     private static readonly int ENEMY_SHOT_MASK = Physics.DefaultRaycastLayers;
 
@@ -47,6 +46,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     private float nextCoverSearch;
     private float nextValidation;
     private bool firedThisPeek;
+    private Transform activeMuzzle;
 
     public enum CombatState { SeekingCover, MovingToCover, Hiding, MovingToPeek, Peeking, Retreating, Advancing, Melee, Stopped }
     public CombatState State { get; private set; } = CombatState.SeekingCover;
@@ -289,12 +289,17 @@ public sealed class Enemy : MonoBehaviour, IDamageable
 
     private bool HasShot()
     {
-        return EnemySight.Clear(ShotOrigin(), target, attackRange, transform, projectileRadius);
+        Vector3 origin = ShotOrigin();
+        Vector3 shoulder = transform.position;
+        shoulder.y = origin.y;
+        // A long visible barrel must not poke through a wall and fire from its far side.
+        return EnemySight.ClearSegment(shoulder, origin, target, transform, projectileRadius) &&
+            EnemySight.Clear(origin, target, attackRange, transform, projectileRadius);
     }
 
     private Vector3 ShotOrigin()
     {
-        return weaponMount != null ? weaponMount.position : transform.position + Vector3.up * FALLBACK_MUZZLE_HEIGHT;
+        return activeMuzzle != null ? activeMuzzle.position : transform.position + Vector3.up * FALLBACK_MUZZLE_HEIGHT;
     }
 
     private bool TryRangedAttack()
@@ -372,7 +377,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
             return;
         }
         // 근접 러셔는 총이 없어 접촉 거리에서 직접 때린다. 원거리 적은 위에서 발사체만 보낸다.
-        target.ApplyDamage(attackDamage);
+        target.ApplyDamage(attackDamage, transform.position);
     }
 
     // 원거리 적의 발사. 피해는 여기서 주지 않는다. 탄이 플레이어나 지형에 닿을 때 Projectile이 준다.
@@ -389,7 +394,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         }
 
         Vector3 origin = ShotOrigin();
-        Vector3 aim = target.transform.position + Vector3.up * TARGET_CENTER_HEIGHT;
+        Vector3 aim = EnemySight.TargetCenter(target);
         Vector3 direction = aim - origin;
         if (direction.sqrMagnitude < 0.0001f)
         {
@@ -413,6 +418,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     // 무기 모델은 프리팹에 미리 만들어 두고, 이름이 무기 id와 맞는 것만 켠다. 런타임에 메시를 만들지 않는다.
     private void ShowWeapon(string _weaponId)
     {
+        activeMuzzle = null;
         if (weaponMount == null)
         {
             return;
@@ -420,6 +426,10 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         foreach (Transform model in weaponMount)
         {
             model.gameObject.SetActive(model.name == _weaponId);
+            if (model.gameObject.activeSelf)
+            {
+                activeMuzzle = model.Find("Muzzle");
+            }
         }
     }
 

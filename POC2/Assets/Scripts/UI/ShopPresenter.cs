@@ -126,7 +126,8 @@ public sealed class ShopPresenter : MonoBehaviour
                 }
                 else if (gameManager.Loadout.IsOwned(_item.target))
                 {
-                    label += "\n보유 · 장착";
+                    // 보유 무기는 바닥에 놓인 픽업으로만 되찾는다. 상점에서 무료 장착하지 않는다.
+                    label += "\n보유 · 바닥 픽업 필요";
                     price = "";
                 }
                 break;
@@ -153,17 +154,17 @@ public sealed class ShopPresenter : MonoBehaviour
         view.SetSlot(_index, label, price, interactable);
     }
 
-    // 보유 무기는 장착 전환이 무료이므로 장착 중이 아니면 누를 수 있다. 나머지는 살 수 있어야 한다.
+    // 무기 칸은 아직 획득하지 않은 무기만 살 수 있다. 보유 무기(장착 중·바닥 픽업)는 상점에서 누를 수 없다.
     private bool CanUse(ShopData.Item _item, bool _affordable)
     {
         switch (_item.type)
         {
             case ShopInfo.TYPE_WEAPON:
-                if (gameManager.Loadout.IsEquipped(_item.target))
+                if (gameManager.Loadout.IsOwned(_item.target))
                 {
                     return false;
                 }
-                return gameManager.Loadout.IsOwned(_item.target) || _affordable;
+                return _affordable;
             case ShopInfo.TYPE_PERK:
                 return gameManager.Perks.CanBuy(_item.target) && _affordable;
             case ShopInfo.TYPE_HEAL:

@@ -8,5 +8,10 @@
   "stuckSeconds": 3.0,
   "arrivalDistance": 0.2,
   "searchRadius": 65.0,
-  "navSampleDistance": 2.0
+  "navSampleDistance": 2.0,
+  "spawnMinDistance": 12.0,
+  "spawnForwardDot": 0.05,
+  "spawnRetrySeconds": 0.35,
+  "spawnAttemptsPerPoint": 4,
+  "spawnOccupancyPadding": 0.15
 }

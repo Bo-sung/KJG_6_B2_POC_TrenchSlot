@@ -14,4 +14,9 @@ public sealed class EnemyAiData
     public float arrivalDistance = 0.2f;
     public float searchRadius = 65f;
     public float navSampleDistance = 2f;
+    public float spawnMinDistance = 12f;
+    public float spawnForwardDot = 0.05f;
+    public float spawnRetrySeconds = 0.35f;
+    public int spawnAttemptsPerPoint = 4;
+    public float spawnOccupancyPadding = 0.15f;
 }

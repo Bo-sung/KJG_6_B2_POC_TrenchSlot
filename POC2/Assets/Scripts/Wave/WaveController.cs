@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 // 웨이브의 적 스폰 순서와 생존 추적. 웨이브 시간은 GameManager가 관리하고, 여기서는 전멸 여부만 알린다.
 // 스폰은 gameplay 객체 생성이므로 런타임 Instantiate를 쓴다(작업지침 §3 예외).
@@ -9,7 +10,7 @@ public sealed class WaveController : MonoBehaviour
     private const float HEAVY_TINT_SCALE = 0.6f;
 
     [SerializeField] private GameObject enemyPrefab;
-    // 좌우 참호 입구. 스폰 지점을 번갈아 쓴다.
+    // Authored entrances are tried round-robin, but only current-view-safe reachable candidates may spawn.
     [SerializeField] private Transform[] spawnPoints;
     [SerializeField, Min(0f)] private float spawnJitter;
 
@@ -30,6 +31,7 @@ public sealed class WaveController : MonoBehaviour
     public int AliveCount => alive.Count;
     public bool AllSpawned => pending.Count == 0;
     public bool IsRunning => running;
+    public int PendingCount => pending.Count;
 
     public event Action<Enemy> EnemyKilled;
     public event Action Cleared;
@@ -90,8 +92,12 @@ public sealed class WaveController : MonoBehaviour
             spawnTimer -= Time.deltaTime;
             if (spawnTimer <= 0f)
             {
-                Spawn(pending.Dequeue());
-                spawnTimer = spawnInterval;
+                bool spawned = Spawn(pending.Peek());
+                if (spawned)
+                {
+                    pending.Dequeue();
+                }
+                spawnTimer = spawned ? spawnInterval : TableManager.Instance.EnemyAi.spawnRetrySeconds;
             }
         }
 
@@ -122,35 +128,26 @@ public sealed class WaveController : MonoBehaviour
         alive.Clear();
     }
 
-    private void Spawn(string _kind)
+    private bool Spawn(string _kind)
     {
         if (enemyPrefab == null || spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogError("WaveController: 적 프리팹 또는 스폰 지점이 연결되지 않았습니다.");
-            pending.Clear();
-            return;
+            return false;
         }
 
-        Transform point = spawnPoints[spawnIndex % spawnPoints.Length];
-        spawnIndex++;
-        Vector3 jitter = new Vector3(
-            UnityEngine.Random.Range(-spawnJitter, spawnJitter),
-            0f,
-            UnityEngine.Random.Range(-spawnJitter, spawnJitter));
-        // 스폰 흔들림이 참호 벽 안으로 들어가면 가장 가까운 안전한 NavMesh 점을 쓴다.
-        if (!EnemyNavigation.TryStandPoint(point.position + jitter, TableManager.Instance.EnemyAi.navSampleDistance, out Vector3 spawn) &&
-            !EnemyNavigation.TryStandPoint(point.position, TableManager.Instance.EnemyAi.navSampleDistance, out spawn))
+        if (!TryChooseSpawn(out Vector3 spawn))
         {
-            Debug.LogWarning("WaveController: 안전한 NavMesh 스폰 위치가 없어 이번 적을 건너뜁니다.");
-            return;
+            return false;
         }
-        GameObject instance = Instantiate(enemyPrefab, spawn, point.rotation, transform);
+        Vector3 facing = target.transform.position - spawn;
+        facing.y = 0f;
+        GameObject instance = Instantiate(enemyPrefab, spawn, Quaternion.LookRotation(facing), transform);
         Enemy enemy = instance.GetComponent<Enemy>();
         if (enemy == null)
         {
             Debug.LogError("WaveController: 적 프리팹에 Enemy 컴포넌트가 없습니다.");
             Destroy(instance);
-            return;
+            return false;
         }
 
         var stats = EnemyInfo.Find(enemyTable, _kind);
@@ -161,6 +158,85 @@ public sealed class WaveController : MonoBehaviour
         enemy.Configure(stats, weapon, hpMultiplier, color, target);
         enemy.Died += OnEnemyDied;
         alive.Add(enemy);
+        return true;
+    }
+
+    // Check the final sampled/jittered point, never just its authored anchor. No valid point means retry, not loss.
+    public bool TryChooseSpawn(out Vector3 _spawn)
+    {
+        _spawn = default;
+        if (target == null || spawnPoints == null || spawnPoints.Length == 0)
+        {
+            return false;
+        }
+        var tuning = TableManager.Instance.EnemyAi;
+        var view = target.GetComponentInChildren<Camera>();
+        Vector3 forward = view != null ? view.transform.forward : target.transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            forward = target.transform.forward;
+            forward.y = 0f;
+        }
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+        forward.Normalize();
+        if (!NavMesh.SamplePosition(target.transform.position, out NavMeshHit destination, tuning.navSampleDistance, NavMesh.AllAreas))
+        {
+            return false;
+        }
+        var path = new NavMeshPath();
+        for (int offset = 0; offset < spawnPoints.Length; offset++)
+        {
+            int index = (spawnIndex + offset) % spawnPoints.Length;
+            var point = spawnPoints[index];
+            if (point == null)
+            {
+                continue;
+            }
+            for (int attempt = 0; attempt <= tuning.spawnAttemptsPerPoint; attempt++)
+            {
+                // Last attempt uses the anchor, but it must pass exactly the same policy.
+                Vector3 jitter = attempt == tuning.spawnAttemptsPerPoint ? Vector3.zero : new Vector3(
+                    UnityEngine.Random.Range(-spawnJitter, spawnJitter), 0f, UnityEngine.Random.Range(-spawnJitter, spawnJitter));
+                if (!EnemyNavigation.TryStandPoint(point.position + jitter, tuning.navSampleDistance, out Vector3 candidate) ||
+                    !IsInSpawnFront(candidate, target.transform.position, forward, tuning) ||
+                    !NavMesh.CalculatePath(candidate, destination.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+                {
+                    continue;
+                }
+                bool occupied = false;
+                foreach (var collider in Physics.OverlapCapsule(candidate + Vector3.up * EnemyNavigation.RADIUS,
+                    candidate + Vector3.up * (EnemyNavigation.HEIGHT - EnemyNavigation.RADIUS),
+                    EnemyNavigation.RADIUS + tuning.spawnOccupancyPadding, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    // Terrain was checked by TryStandPoint; additionally reject live character occupancy.
+                    if (collider.GetComponentInParent<Enemy>() != null || collider.GetComponentInParent<PlayerHealth>() != null)
+                    {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (!occupied)
+                {
+                    _spawn = candidate;
+                    spawnIndex = (index + 1) % spawnPoints.Length;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static bool IsInSpawnFront(Vector3 _candidate, Vector3 _player, Vector3 _forward, EnemyAiData _tuning)
+    {
+        Vector3 delta = _candidate - _player;
+        delta.y = 0f;
+        _forward.y = 0f;
+        return delta.sqrMagnitude >= _tuning.spawnMinDistance * _tuning.spawnMinDistance &&
+            _forward.sqrMagnitude > 0.0001f && Vector3.Dot(delta.normalized, _forward.normalized) >= _tuning.spawnForwardDot;
     }
 
     private void OnEnemyDied(Enemy _enemy)

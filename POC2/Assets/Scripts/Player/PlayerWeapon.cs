@@ -21,8 +21,10 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     [SerializeField] private InputActionReference fireAction;
     [SerializeField] private InputActionReference reloadAction;
+    [SerializeField] private InputActionReference pickupAction;
     [SerializeField] private Camera aimCamera;
     [SerializeField] private PlayerHealth health;
+    [SerializeField] private PlayerInteractor interactor;
     [SerializeField] private LayerMask hitLayers;
     [SerializeField] private WeaponSettings settings;
 
@@ -62,12 +64,14 @@ public sealed class PlayerWeapon : MonoBehaviour
     {
         fireAction?.action?.Enable();
         reloadAction?.action?.Enable();
+        pickupAction?.action?.Enable();
     }
 
     private void OnDisable()
     {
         fireAction?.action?.Disable();
         reloadAction?.action?.Disable();
+        pickupAction?.action?.Disable();
     }
 
     private void Update()
@@ -89,7 +93,15 @@ public sealed class PlayerWeapon : MonoBehaviour
             RefillImmediately();
         }
 
-        if (reloadAction != null && reloadAction.action != null && reloadAction.action.WasPressedThisFrame())
+        bool wantsReload = reloadAction != null && reloadAction.action != null && reloadAction.action.WasPressedThisFrame();
+        // 이번 프레임에 픽업 키로 줍기가 예약됐으면 재장전보다 줍기가 앞선다(게임패드 X는 두 동작에 같이 묶여 있다).
+        // 예약은 PlayerInteractor가 프레임 단위로 한 번 정하므로 두 컴포넌트의 Update 순서와 상관없이 어느 총도 재장전하지 않는다.
+        // 줍기 예약이 없으면 R이든 X든 그대로 재장전한다.
+        if (wantsReload && ReloadBlockedByPickupInView())
+        {
+            CancelReload();
+        }
+        else if (wantsReload)
         {
             StartReload();
         }
@@ -106,12 +118,32 @@ public sealed class PlayerWeapon : MonoBehaviour
         }
     }
 
+    // 새로 구매한 무기는 탄창을 채운 채 든다.
     public void Configure(WeaponSettings _settings)
+    {
+        Configure(_settings, _settings.magazineSize);
+    }
+
+    // 바닥 픽업을 주운 경우 놓을 때의 탄약을 그대로 이어받는다. 재장전은 취소하고 탄약은 채우지 않는다.
+    public void Configure(WeaponSettings _settings, int _ammo)
     {
         settings = _settings;
         isReloading = false;
         nextShotTime = 0f;
-        RefillImmediately();
+        Ammo = Mathf.Clamp(_ammo, 0, Mathf.Max(0, settings.magazineSize));
+        AmmoChanged?.Invoke(Ammo, settings.magazineSize);
+    }
+
+    // 이번 프레임 줍기 예약 여부. 이전 프레임 조준 캐시가 아니라 이번 프레임의 픽업 키 입력과 조준으로 정해진다.
+    private bool ReloadBlockedByPickupInView()
+    {
+        return interactor != null && interactor.PickupClaimThisFrame != null;
+    }
+
+    // 무기를 내려놓을 때 재장전을 끊는다. 진행 중이던 재장전은 완료되지 않으며 탄약 이득도 없다.
+    public void CancelReload()
+    {
+        isReloading = false;
     }
 
     public void StartReload()

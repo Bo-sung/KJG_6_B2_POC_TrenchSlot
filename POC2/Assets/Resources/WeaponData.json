@@ -1,5 +1,6 @@
 {
   "status": "provisional",
+  "drop": { "minDistance": 1.2, "maxDistance": 1.8, "clearanceRadius": 0.2, "clearanceHeight": 0.5 },
   "weapons": [
     { "id": "revolver", "name": "리볼버", "magazineSize": 6, "damage": 25, "range": 60, "shotsPerSecond": 2.5, "reloadSeconds": 1.8, "automatic": false, "startOwned": true, "projectileSpeed": 120, "projectileLifetime": 1.0, "projectileRadius": 0.05 },
     { "id": "bolt", "name": "볼트액션 소총", "magazineSize": 5, "damage": 25, "range": 150, "shotsPerSecond": 0.9, "reloadSeconds": 2.2, "automatic": false, "startOwned": false, "projectileSpeed": 200, "projectileLifetime": 1.0, "projectileRadius": 0.04 },

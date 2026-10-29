@@ -36,6 +36,12 @@ public static class WeaponInfo
         return "";
     }
 
+    // 떨어뜨린 무기 자리 규칙. 테이블이 없으면 null이며, 호출 측은 자리를 찾지 못한 것으로 처리한다.
+    public static WeaponData.DropSettings Drop(WeaponData _table)
+    {
+        return _table != null ? _table.drop : null;
+    }
+
     public static void Validate(WeaponData _table)
     {
         if (_table == null || _table.weapons == null || _table.weapons.Length == 0)
@@ -46,6 +52,11 @@ public static class WeaponInfo
         if (StartWeaponId(_table) == "")
         {
             Debug.LogError("시작 무기(startOwned)가 없습니다.");
+        }
+        var drop = _table.drop;
+        if (drop == null || drop.minDistance <= 0f || drop.maxDistance < drop.minDistance || drop.clearanceRadius <= 0f || drop.clearanceHeight <= 0f)
+        {
+            Debug.LogError("무기 drop 자리 규칙(minDistance·maxDistance·clearanceRadius·clearanceHeight)이 올바르지 않습니다.");
         }
         foreach (var weapon in _table.weapons)
         {

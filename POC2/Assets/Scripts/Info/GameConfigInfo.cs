@@ -26,6 +26,13 @@ public static class GameConfigInfo
 
     public static float InteractDistance(GameConfigData _table) => _table != null ? _table.interactDistance : 0f;
 
+    // Defaults are compatibility fallbacks for old tables / isolated component tests.
+    public static float CrouchHeightRatio(GameConfigData _table) => _table != null && _table.crouchHeightRatio > 0f ? Mathf.Clamp(_table.crouchHeightRatio, 0.1f, 1f) : 0.55f;
+    public static float CrouchSpeedRatio(GameConfigData _table) => _table != null && _table.crouchSpeedRatio > 0f ? Mathf.Clamp01(_table.crouchSpeedRatio) : 0.5f;
+    public static float CrouchCameraSmoothSeconds(GameConfigData _table) => _table != null && _table.crouchCameraSmoothSeconds > 0f ? _table.crouchCameraSmoothSeconds : 0.12f;
+    public static float DamageDirectionHoldSeconds(GameConfigData _table) => _table != null ? Mathf.Max(0f, _table.damageDirectionHoldSeconds) : 0.2f;
+    public static float DamageDirectionFadeSeconds(GameConfigData _table) => _table != null && _table.damageDirectionFadeSeconds > 0f ? _table.damageDirectionFadeSeconds : 0.8f;
+
     public static void Validate(GameConfigData _table)
     {
         if (_table == null)
@@ -36,6 +43,10 @@ public static class GameConfigInfo
         if (_table.maxHealth <= 0)
         {
             Debug.LogError("maxHealth는 1 이상이어야 합니다.");
+        }
+        if (_table.crouchHeightRatio <= 0f || _table.crouchHeightRatio >= 1f || _table.crouchSpeedRatio <= 0f || _table.crouchSpeedRatio > 1f || _table.crouchCameraSmoothSeconds <= 0f || _table.damageDirectionHoldSeconds < 0f || _table.damageDirectionFadeSeconds <= 0f)
+        {
+            Debug.LogError("Crouch / damage direction tuning is invalid.");
         }
         if (_table.startMoney < 0 || _table.healAmount < 0)
         {

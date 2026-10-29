@@ -32,6 +32,8 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private CanvasGroup hitMarkerGroup;
     [SerializeField] private TMP_Text hitMarkerText;
     [SerializeField] private Image damageFlash;
+    [SerializeField] private CanvasGroup damageDirectionGroup;
+    [SerializeField] private RectTransform damageDirectionPivot;
     [SerializeField, Min(0.1f)] private float bannerHoldSeconds = 2f;
     [SerializeField, Min(0.1f)] private float resultHoldSeconds = 2.5f;
     [SerializeField, Min(0.01f)] private float hitMarkerHoldSeconds = 0.08f;
@@ -57,6 +59,16 @@ public sealed class HudView : MonoBehaviour
         if (hitMarkerGroup != null)
         {
             hitMarkerGroup.alpha = 0f;
+        }
+        SetDamageDirection(0f, 0f);
+    }
+
+    public void SetDamageDirection(float _bearingDegrees, float _alpha)
+    {
+        if (damageDirectionGroup != null && damageDirectionPivot != null)
+        {
+            damageDirectionGroup.alpha = Mathf.Clamp01(_alpha);
+            damageDirectionPivot.localRotation = Quaternion.Euler(0f, 0f, -_bearingDegrees);
         }
     }
 

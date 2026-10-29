@@ -1,0 +1,300 @@
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+// 무기 바닥 드롭 전용 저작 도구. 다른 Poc 빌더의 헬퍼는 쓰지 않고, 이 파일 안에서만 프리팹·머티리얼을 만든다.
+// CLI: -batchmode -nographics -executeMethod PocWeaponDropAuthoring.AuthorAll -quit
+// 프리팹과 입력 참조를 만든다. WireSavedGame은 Game.unity에 바닥 무기 연결을 멱등하게 적용한다(같은 씬에 여러 번 돌려도 한 벌만 남는다).
+public static class PocWeaponDropAuthoring
+{
+    public const string PREFAB_DIR = "Assets/Prefabs/Weapons";
+    public const string MATERIAL_DIR = "Assets/Materials/Weapons";
+    public const string INPUT_REF_PATH = "Assets/Input/PickupRef.asset";
+    public const string GAME_SCENE = "Assets/Scenes/Game.unity";
+    public const string HELD_PREFAB_PATH = PREFAB_DIR + "/HeldWeapons.prefab";
+    public const string CATALOG_PREFAB_PATH = PREFAB_DIR + "/WeaponPickupCatalog.prefab";
+    public const string PICKUP_PREFAB_FORMAT = PREFAB_DIR + "/Pickup_{0}.prefab";
+
+    // PlayerInteractor의 interactLayers(비트 9)와 맞춘다. 이 레이어에 있어야 조준 질의가 픽업을 찾는다.
+    private const int PICKUP_LAYER = 9;
+    // 들고 있는 무기 모델 위치. PlayerWeapon의 MUZZLE_OFFSET 기준과 맞춘다.
+    private static readonly Vector3 HELD_LOCAL_POSITION = new Vector3(0.25f, -0.22f, 0.6f);
+    private const string VIEW_PIVOT = "ViewPivot";
+    private const string DROP_ROOT_NAME = "WeaponDrops";
+    private const string DROPPED_NAME = "Dropped";
+    private const string OLD_REVOLVER_NAME = "Revolver";
+
+    private static readonly string[] WEAPON_IDS = { "revolver", "bolt", "smg" };
+
+    private static Material metal;
+    private static Material wood;
+    private static Material accent;
+
+    public static void AuthorAll()
+    {
+        EnsureFolder("Assets", "Prefabs");
+        EnsureFolder("Assets/Prefabs", "Weapons");
+        EnsureFolder("Assets/Materials", "Weapons");
+        EnsureFolder("Assets", "Input");
+        LoadMaterials();
+
+        var pickups = new GameObject[WEAPON_IDS.Length];
+        for (int i = 0; i < WEAPON_IDS.Length; i++)
+        {
+            pickups[i] = BuildPickupPrefab(WEAPON_IDS[i]);
+        }
+        BuildHeldPrefab();
+        BuildCatalogPrefab(pickups);
+        EnsurePickupReference();
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("PocWeaponDropAuthoring: 프리팹과 입력 참조를 만들었습니다.");
+    }
+
+    // Game.unity에 바닥 무기 연결을 적용한다. 이미 적용되어 있으면 아무것도 바꾸지 않는다.
+    // 적용 항목: PlayerInteractor 픽업 입력, WeaponDrops(카탈로그·Dropped 부모), ViewPivot 아래 HeldWeapons, 구 Revolver 큐브 비활성, GameManager 참조.
+    public static void WireSavedGame()
+    {
+        var scene = EditorSceneManager.OpenScene(GAME_SCENE, OpenSceneMode.Single);
+        var player = GameObject.Find("Player");
+        var interactor = player != null ? player.GetComponent<PlayerInteractor>() : null;
+        var gameManager = Object.FindFirstObjectByType<GameManager>();
+        var pivot = player != null ? player.transform.Find(VIEW_PIVOT) : null;
+        if (interactor == null || gameManager == null || pivot == null)
+        {
+            Debug.LogError("PocWeaponDropAuthoring.WireSavedGame: Player/PlayerInteractor/GameManager/ViewPivot 중 찾지 못한 것이 있습니다.");
+            return;
+        }
+
+        var interactorSo = new SerializedObject(interactor);
+        interactorSo.FindProperty("pickupAction").objectReferenceValue = EnsurePickupReference();
+        interactorSo.ApplyModifiedPropertiesWithoutUndo();
+
+        var root = GameObject.Find(DROP_ROOT_NAME);
+        if (root == null)
+        {
+            root = new GameObject(DROP_ROOT_NAME);
+        }
+        var catalog = root.GetComponentInChildren<WeaponPickupCatalog>();
+        if (catalog == null)
+        {
+            var catalogAsset = AssetDatabase.LoadAssetAtPath<GameObject>(CATALOG_PREFAB_PATH);
+            catalog = ((GameObject)PrefabUtility.InstantiatePrefab(catalogAsset, root.scene)).GetComponent<WeaponPickupCatalog>();
+            catalog.transform.SetParent(root.transform, false);
+        }
+        var dropped = root.transform.Find(DROPPED_NAME);
+        if (dropped == null)
+        {
+            dropped = new GameObject(DROPPED_NAME).transform;
+            dropped.SetParent(root.transform, false);
+        }
+
+        var heldInstance = pivot.Find("HeldWeapons");
+        if (heldInstance == null)
+        {
+            var heldAsset = AssetDatabase.LoadAssetAtPath<GameObject>(HELD_PREFAB_PATH);
+            heldInstance = ((GameObject)PrefabUtility.InstantiatePrefab(heldAsset, scene)).transform;
+            heldInstance.SetParent(pivot, false);
+            heldInstance.localPosition = HELD_LOCAL_POSITION;
+            heldInstance.localRotation = Quaternion.identity;
+        }
+        var oldGun = pivot.Find(OLD_REVOLVER_NAME);
+        if (oldGun != null && oldGun.gameObject.activeSelf)
+        {
+            oldGun.gameObject.SetActive(false);
+        }
+
+        // 줍기 X 우선순위 판정에 쓰이는 PlayerWeapon 참조(interactor·pickupAction)를 같이 연결한다.
+        var playerWeapon = player.GetComponent<PlayerWeapon>();
+        if (playerWeapon != null)
+        {
+            var weaponSo = new SerializedObject(playerWeapon);
+            weaponSo.FindProperty("interactor").objectReferenceValue = interactor;
+            weaponSo.FindProperty("pickupAction").objectReferenceValue = EnsurePickupReference();
+            weaponSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var gmSo = new SerializedObject(gameManager);
+        gmSo.FindProperty("pickups").objectReferenceValue = catalog;
+        gmSo.FindProperty("heldModels").objectReferenceValue = heldInstance.GetComponent<WeaponHeldModels>();
+        gmSo.FindProperty("dropRoot").objectReferenceValue = dropped;
+        gmSo.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("PocWeaponDropAuthoring.WireSavedGame: Game 씬 연결을 적용했습니다(이미 적용돼 있으면 변화 없음).");
+    }
+
+    private static GameObject BuildPickupPrefab(string _id)
+    {
+        var root = new GameObject($"Pickup_{_id}");
+        root.layer = PICKUP_LAYER;
+        var pickup = root.AddComponent<WeaponPickup>();
+        var pickupSo = new SerializedObject(pickup);
+        pickupSo.FindProperty("weaponId").stringValue = _id;
+        pickupSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // 바닥 높이 0 기준. 모델은 살짝 띄워 바닥에 얹힌 것처럼 보이게 한다.
+        var model = new GameObject("Model").transform;
+        model.SetParent(root.transform, false);
+        model.localPosition = new Vector3(0f, 0.1f, 0f);
+        BuildModel(_id, model);
+
+        var box = root.AddComponent<BoxCollider>();
+        box.center = new Vector3(0f, 0.12f, 0f);
+        box.size = BoundsSize(_id);
+        string path = string.Format(PICKUP_PREFAB_FORMAT, _id);
+        PrefabUtility.SaveAsPrefabAsset(root, path);
+        Object.DestroyImmediate(root);
+        return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+    }
+
+    private static void BuildHeldPrefab()
+    {
+        var root = new GameObject("HeldWeapons");
+        var held = root.AddComponent<WeaponHeldModels>();
+        var entries = new WeaponHeldModels.Entry[WEAPON_IDS.Length];
+        for (int i = 0; i < WEAPON_IDS.Length; i++)
+        {
+            var model = new GameObject(WEAPON_IDS[i]).transform;
+            model.SetParent(root.transform, false);
+            BuildModel(WEAPON_IDS[i], model);
+            entries[i] = new WeaponHeldModels.Entry { id = WEAPON_IDS[i], model = model.gameObject };
+        }
+        var heldSo = new SerializedObject(held);
+        var array = heldSo.FindProperty("entries");
+        array.arraySize = entries.Length;
+        for (int i = 0; i < entries.Length; i++)
+        {
+            var element = array.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("id").stringValue = entries[i].id;
+            element.FindPropertyRelative("model").objectReferenceValue = entries[i].model;
+        }
+        heldSo.ApplyModifiedPropertiesWithoutUndo();
+        PrefabUtility.SaveAsPrefabAsset(root, HELD_PREFAB_PATH);
+        Object.DestroyImmediate(root);
+    }
+
+    private static void BuildCatalogPrefab(GameObject[] _pickups)
+    {
+        var root = new GameObject("WeaponPickupCatalog");
+        var catalog = root.AddComponent<WeaponPickupCatalog>();
+        var catalogSo = new SerializedObject(catalog);
+        var array = catalogSo.FindProperty("entries");
+        array.arraySize = _pickups.Length;
+        for (int i = 0; i < _pickups.Length; i++)
+        {
+            var element = array.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("id").stringValue = WEAPON_IDS[i];
+            element.FindPropertyRelative("prefab").objectReferenceValue = _pickups[i].GetComponent<WeaponPickup>();
+        }
+        catalogSo.ApplyModifiedPropertiesWithoutUndo();
+        PrefabUtility.SaveAsPrefabAsset(root, CATALOG_PREFAB_PATH);
+        Object.DestroyImmediate(root);
+    }
+
+    // 무기 종류마다 알아볼 수 있는 실루엣을 만든다. 리볼버=드럼+짧은 총신, 볼트액션=긴 총신+개머리판+스코프, 기관단총=박스 몸체+탄창.
+    private static void BuildModel(string _id, Transform _parent)
+    {
+        switch (_id)
+        {
+            case "revolver":
+                Part(PrimitiveType.Cube, "Frame", _parent, new Vector3(0f, 0.05f, 0f), new Vector3(0.08f, 0.12f, 0.42f), metal);
+                Part(PrimitiveType.Cylinder, "Drum", _parent, new Vector3(0f, 0.05f, -0.02f), new Vector3(0.11f, 0.04f, 0.11f), metal, new Vector3(90f, 0f, 0f));
+                Part(PrimitiveType.Cube, "Barrel", _parent, new Vector3(0f, 0.06f, 0.3f), new Vector3(0.05f, 0.05f, 0.2f), metal);
+                Part(PrimitiveType.Cube, "Grip", _parent, new Vector3(0f, -0.09f, -0.16f), new Vector3(0.07f, 0.18f, 0.09f), wood, new Vector3(-15f, 0f, 0f));
+                break;
+            case "bolt":
+                Part(PrimitiveType.Cube, "Barrel", _parent, new Vector3(0f, 0.05f, 0.2f), new Vector3(0.04f, 0.05f, 0.9f), metal);
+                Part(PrimitiveType.Cube, "Stock", _parent, new Vector3(0f, -0.02f, -0.35f), new Vector3(0.07f, 0.12f, 0.35f), wood);
+                Part(PrimitiveType.Cylinder, "Scope", _parent, new Vector3(0f, 0.11f, 0.1f), new Vector3(0.03f, 0.12f, 0.03f), accent, new Vector3(90f, 0f, 0f));
+                Part(PrimitiveType.Cube, "BoltHandle", _parent, new Vector3(0.05f, 0.03f, -0.1f), new Vector3(0.04f, 0.06f, 0.04f), accent);
+                break;
+            case "smg":
+                Part(PrimitiveType.Cube, "Body", _parent, new Vector3(0f, 0.04f, 0f), new Vector3(0.1f, 0.1f, 0.42f), metal);
+                Part(PrimitiveType.Cube, "Magazine", _parent, new Vector3(0f, -0.1f, 0.02f), new Vector3(0.06f, 0.16f, 0.06f), metal);
+                Part(PrimitiveType.Cube, "Barrel", _parent, new Vector3(0f, 0.04f, 0.3f), new Vector3(0.04f, 0.04f, 0.2f), metal);
+                Part(PrimitiveType.Cube, "Stock", _parent, new Vector3(0f, 0.02f, -0.3f), new Vector3(0.05f, 0.08f, 0.2f), wood);
+                break;
+            default:
+                Debug.LogError($"PocWeaponDropAuthoring: 알 수 없는 무기 {_id}");
+                break;
+        }
+    }
+
+    private static void Part(PrimitiveType _type, string _name, Transform _parent, Vector3 _position, Vector3 _scale, Material _material, Vector3 _euler = default)
+    {
+        var go = GameObject.CreatePrimitive(_type);
+        go.name = _name;
+        go.transform.SetParent(_parent, false);
+        go.transform.localPosition = _position;
+        go.transform.localRotation = Quaternion.Euler(_euler);
+        go.transform.localScale = _scale;
+        go.GetComponent<Renderer>().sharedMaterial = _material;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+    }
+
+    private static Vector3 BoundsSize(string _id)
+    {
+        switch (_id)
+        {
+            case "bolt":
+                return new Vector3(0.14f, 0.2f, 1f);
+            case "smg":
+                return new Vector3(0.14f, 0.2f, 0.5f);
+            default:
+                return new Vector3(0.14f, 0.2f, 0.56f);
+        }
+    }
+
+    private static InputActionReference EnsurePickupReference()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<InputActionReference>(INPUT_REF_PATH);
+        if (existing != null)
+        {
+            return existing;
+        }
+        var asset = AssetDatabase.LoadAssetAtPath<InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+        var action = asset.FindAction("Player/Pickup");
+        if (action == null)
+        {
+            Debug.LogError("PocWeaponDropAuthoring: Player/Pickup 액션을 찾지 못했습니다.");
+            return null;
+        }
+        var reference = ScriptableObject.CreateInstance<InputActionReference>();
+        reference.Set(action);
+        AssetDatabase.CreateAsset(reference, INPUT_REF_PATH);
+        return reference;
+    }
+
+    private static void LoadMaterials()
+    {
+        metal = Mat("WeaponMetal", new Color(0.2f, 0.2f, 0.22f));
+        wood = Mat("WeaponWood", new Color(0.4f, 0.25f, 0.12f));
+        accent = Mat("WeaponAccent", new Color(0.55f, 0.45f, 0.12f));
+    }
+
+    private static Material Mat(string _name, Color _color)
+    {
+        string path = $"{MATERIAL_DIR}/{_name}.mat";
+        var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existing != null)
+        {
+            return existing;
+        }
+        var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        material.SetColor("_BaseColor", _color);
+        AssetDatabase.CreateAsset(material, path);
+        return material;
+    }
+
+    private static void EnsureFolder(string _parent, string _name)
+    {
+        string path = $"{_parent}/{_name}";
+        if (!AssetDatabase.IsValidFolder(path))
+        {
+            AssetDatabase.CreateFolder(_parent, _name);
+        }
+    }
+}

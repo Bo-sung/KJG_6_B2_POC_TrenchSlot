@@ -9,11 +9,22 @@ public sealed class HudPresenter : MonoBehaviour
     [SerializeField] private PlayerWeapon weapon;
     [SerializeField] private PlayerInteractor interactor;
     [SerializeField] private SlotMachinePresenter slot;
+    [SerializeField] private Transform damageView;
 
     private float lastHealth = -1f;
+    private Vector3 damageSource;
+    private float directionElapsed = float.PositiveInfinity;
+    private GameConfigData feedbackConfig;
+    private string interactionPrompt;
+    private string pickupPrompt;
 
     private void Start()
     {
+        feedbackConfig = TableManager.Instance.GameConfig;
+        if (damageView == null && Camera.main != null)
+        {
+            damageView = Camera.main.transform;
+        }
         if (gameManager != null)
         {
             gameManager.WaveStarted += OnWaveStarted;
@@ -29,11 +40,13 @@ public sealed class HudPresenter : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.HealthChanged += OnHealthChanged;
+            playerHealth.DamagedFrom += OnDamagedFrom;
             OnHealthChanged(playerHealth.CurrentHealth, playerHealth.MaxHealth);
         }
         if (interactor != null)
         {
-            interactor.PromptChanged += view.SetPrompt;
+            interactor.PromptChanged += OnInteractionPromptChanged;
+            interactor.PickupPromptChanged += OnPickupPromptChanged;
         }
         if (slot != null)
         {
@@ -64,10 +77,12 @@ public sealed class HudPresenter : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.HealthChanged -= OnHealthChanged;
+            playerHealth.DamagedFrom -= OnDamagedFrom;
         }
         if (interactor != null)
         {
-            interactor.PromptChanged -= view.SetPrompt;
+            interactor.PromptChanged -= OnInteractionPromptChanged;
+            interactor.PickupPromptChanged -= OnPickupPromptChanged;
         }
         if (slot != null)
         {
@@ -81,9 +96,58 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void Update()
     {
+        UpdateDamageDirection(Time.deltaTime);
         if (weapon != null)
         {
             view.SetAmmo(weapon.Ammo, weapon.MagazineSize, weapon.IsReloading, weapon.ReloadProgress);
+        }
+    }
+
+    private void OnDamagedFrom(Vector3 _source)
+    {
+        damageSource = _source;
+        directionElapsed = 0f;
+        UpdateDamageDirection(0f);
+    }
+
+    private void OnInteractionPromptChanged(string _prompt)
+    {
+        interactionPrompt = _prompt;
+        RefreshPrompt();
+    }
+
+    private void OnPickupPromptChanged(string _prompt)
+    {
+        pickupPrompt = _prompt;
+        RefreshPrompt();
+    }
+
+    private void RefreshPrompt()
+    {
+        // Independent interactor events can arrive in either order in the same frame.
+        view.SetPrompt(!string.IsNullOrEmpty(pickupPrompt) ? pickupPrompt : interactionPrompt);
+    }
+
+    public static float DamageBearing(Transform _view, Vector3 _source)
+    {
+        Vector3 forward = Vector3.ProjectOnPlane(_view.forward, Vector3.up);
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            forward = Vector3.ProjectOnPlane(_view.up, Vector3.up);
+        }
+        Vector3 incoming = Vector3.ProjectOnPlane(_source - _view.position, Vector3.up);
+        return Vector3.SignedAngle(forward, incoming, Vector3.up);
+    }
+
+    public void UpdateDamageDirection(float _deltaTime)
+    {
+        directionElapsed += _deltaTime;
+        float hold = GameConfigInfo.DamageDirectionHoldSeconds(feedbackConfig);
+        float fade = GameConfigInfo.DamageDirectionFadeSeconds(feedbackConfig);
+        float alpha = 1f - Mathf.Clamp01((directionElapsed - hold) / fade);
+        if (view != null && damageView != null)
+        {
+            view.SetDamageDirection(DamageBearing(damageView, damageSource), alpha);
         }
     }
 

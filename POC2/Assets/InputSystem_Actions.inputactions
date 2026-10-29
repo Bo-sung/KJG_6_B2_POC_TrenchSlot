@@ -94,6 +94,15 @@
           "processors": "",
           "interactions": "",
           "initialStateCheck": false
+        },
+        {
+          "name": "Pickup",
+          "type": "Button",
+          "id": "5d3f0a7e-2b84-4c1e-9a6d-7f1c3e8b0a42",
+          "expectedControlType": "Button",
+          "processors": "",
+          "interactions": "",
+          "initialStateCheck": false
         }
       ],
       "bindings": [
@@ -484,6 +493,17 @@
         },
         {
           "name": "",
+          "id": "3a7c9e1f-5b2d-4f60-8e14-d9b6a2c7f085",
+          "path": "<Keyboard>/leftCtrl",
+          "interactions": "",
+          "processors": "",
+          "groups": "Keyboard&Mouse",
+          "action": "Crouch",
+          "isComposite": false,
+          "isPartOfComposite": false
+        },
+        {
+          "name": "",
           "id": "84aa1bd2-2e08-4bf4-8885-80d7e6e910d9",
           "path": "<Keyboard>/r",
           "interactions": "",
@@ -501,6 +521,28 @@
           "processors": "",
           "groups": "Gamepad",
           "action": "Reload",
+          "isComposite": false,
+          "isPartOfComposite": false
+        },
+        {
+          "name": "",
+          "id": "9b6e2c41-7d03-4a8f-b5e1-2c9a0f6d3e17",
+          "path": "<Keyboard>/f",
+          "interactions": "",
+          "processors": "",
+          "groups": "Keyboard&Mouse",
+          "action": "Pickup",
+          "isComposite": false,
+          "isPartOfComposite": false
+        },
+        {
+          "name": "",
+          "id": "e4a1d8f2-3c5b-4e7a-8f90-6b2d1c4a7e53",
+          "path": "<Gamepad>/buttonWest",
+          "interactions": "",
+          "processors": "",
+          "groups": "Gamepad",
+          "action": "Pickup",
           "isComposite": false,
           "isPartOfComposite": false
         }
