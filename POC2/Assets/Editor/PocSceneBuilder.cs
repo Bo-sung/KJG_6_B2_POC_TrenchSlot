@@ -351,6 +351,8 @@ public static class PocSceneBuilder
         gmSo.FindProperty("playerHealth").objectReferenceValue = health;
         gmSo.FindProperty("weapon").objectReferenceValue = weapon;
         gmSo.FindProperty("interactor").objectReferenceValue = interactor;
+        var ammoPickupAsset = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Pickups/AmmoPickup.prefab");
+        gmSo.FindProperty("ammoPickupPrefab").objectReferenceValue = ammoPickupAsset != null ? ammoPickupAsset.GetComponent<AmmoPickup>() : null;
         gmSo.ApplyModifiedPropertiesWithoutUndo();
 
         var slotInstance = InstantiatePrefab($"{PocAssetBuilder.GAMEPLAY_PREFAB_DIR}/SlotMachine.prefab");

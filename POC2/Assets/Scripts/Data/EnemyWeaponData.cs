@@ -8,6 +8,7 @@ public sealed class EnemyWeaponData
     public sealed class Entry
     {
         public string id;
+        public string dropAmmoId;
         public string name;
         // 시대 표기(MUSKET·WWI·WWII). 표시·확인용이며 판정에는 쓰지 않는다.
         public string era;

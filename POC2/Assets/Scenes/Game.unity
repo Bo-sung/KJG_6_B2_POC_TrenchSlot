@@ -1985,6 +1985,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c1cfab4404805c4a875a83f4b32b4da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  ammoPickupPrefab: {fileID: 11400000, guid: 24f55afc53834a73b3e43ed81d556daa, type: 3}
   waves: {fileID: 227273763}
   playerHealth: {fileID: 933281247}
   weapon: {fileID: 933281246}

@@ -1,5 +1,6 @@
 {
   "status": "provisional",
+  "pickup": { "dropChance": 1.0, "pickupDistance": 1.5, "magazineFraction": 0.5 },
   "ammoTypes": [
     { "id": "pistol", "name": "권총 탄약", "color": "#F38D11", "referenceMagazineSize": 6, "maxReserve": 60, "startingReserve": 36 },
     { "id": "sniper", "name": "저격 탄약", "color": "#F3D111", "referenceMagazineSize": 5, "maxReserve": 50, "startingReserve": 30 },

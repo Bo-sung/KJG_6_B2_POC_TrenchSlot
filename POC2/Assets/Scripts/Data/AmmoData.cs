@@ -15,5 +15,14 @@ public sealed class AmmoData
     }
 
     public string status;
+    [Serializable]
+    public sealed class PickupSettings
+    {
+        public float dropChance;
+        public float pickupDistance;
+        public float magazineFraction;
+    }
+
+    public PickupSettings pickup;
     public Entry[] ammoTypes = Array.Empty<Entry>();
 }

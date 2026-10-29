@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 // 한 판의 흐름을 관리한다. 웨이브(슬롯 가능) → 정비(상점) → 다음 웨이브를 반복하며, 플레이어 사망 시 종료한다.
@@ -23,6 +24,10 @@ public sealed class GameManager : MonoBehaviour
     [SerializeField] private WeaponHeldModels heldModels;
     // 바닥 무기의 부모. 비워 두면 이 오브젝트 아래에 둔다. 사망 시 여기 있는 바닥 무기를 모두 치운다.
     [SerializeField] private Transform dropRoot;
+    [SerializeField] private AmmoPickup ammoPickupPrefab;
+
+    private const string AMMO_PICKUP_PATH = "Pickups/AmmoPickup";
+    private readonly HashSet<AmmoPickup> ammoDrops = new HashSet<AmmoPickup>();
 
     // 자리 확보 검사용 물리 질의 버퍼(한 번에 겹친 콜라이더를 받는다).
     private static readonly Collider[] OVERLAP_BUFFER = new Collider[16];
@@ -87,6 +92,15 @@ public sealed class GameManager : MonoBehaviour
         perks = new PerkInventory(table.Perk);
         loadout = new WeaponLoadout(WeaponInfo.StartWeaponId(table.Weapon));
         ammo = new AmmoInventory(table.Ammo);
+        if (ammoPickupPrefab == null)
+        {
+            var prefab = Resources.Load<GameObject>(AMMO_PICKUP_PATH);
+            ammoPickupPrefab = prefab != null ? prefab.GetComponent<AmmoPickup>() : null;
+        }
+        if (ammoPickupPrefab == null)
+        {
+            Debug.LogError("탄약 픽업 프리팹을 찾지 못했습니다.");
+        }
 
         if (playerHealth != null)
         {
@@ -121,6 +135,7 @@ public sealed class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        ClearAmmoDrops();
         if (playerHealth != null)
         {
             playerHealth.Died -= OnPlayerDied;
@@ -209,20 +224,85 @@ public sealed class GameManager : MonoBehaviour
 
     private void SetPhase(GamePhase _next)
     {
+        phase = _next;
+        if (_next != GamePhase.Wave)
+        {
+            ClearAmmoDrops();
+        }
         if (_next != GamePhase.Wave && weapon != null)
         {
             weapon.CancelReload();
         }
-        phase = _next;
         PhaseChanged?.Invoke(phase);
     }
 
     private void OnEnemyKilled(Enemy _enemy)
     {
+        SpawnAmmoDrop(_enemy);
         wallet.Add(_enemy.Reward);
         killsThisWave++;
         totalKills++;
         KillsChanged?.Invoke(killsThisWave);
+    }
+
+    private void SpawnAmmoDrop(Enemy _enemy)
+    {
+        if (_enemy == null || !_enemy.IsDead || !IsWaveActive || playerHealth == null || !playerHealth.IsAlive || ammoPickupPrefab == null)
+        {
+            return;
+        }
+        var table = TableManager.Instance.Ammo;
+        var entry = AmmoInfo.Find(table, _enemy.DropAmmoId);
+        int amount = AmmoInfo.DropAmount(entry, table.pickup);
+        if (amount <= 0 || !AmmoInfo.ShouldDrop(table.pickup, UnityEngine.Random.value))
+        {
+            return;
+        }
+        AmmoPickup drop = Instantiate(ammoPickupPrefab, _enemy.transform.position, Quaternion.identity, transform);
+        drop.Initialize(this, entry, amount);
+        ammoDrops.Add(drop);
+    }
+
+    public int TryCollectAmmo(AmmoPickup _pickup)
+    {
+        if (_pickup == null || !_pickup.isActiveAndEnabled || _pickup.IsClaimed || !ammoDrops.Contains(_pickup) ||
+            !IsWaveActive || playerHealth == null || !playerHealth.IsAlive || ammo == null ||
+            !ammo.Contains(_pickup.AmmoId) || ammo.GetReserve(_pickup.AmmoId) >= ammo.GetMaximum(_pickup.AmmoId))
+        {
+            return 0;
+        }
+        var settings = TableManager.Instance.Ammo.pickup;
+        if (settings == null || float.IsNaN(settings.pickupDistance) || float.IsInfinity(settings.pickupDistance) || settings.pickupDistance <= 0f ||
+            Vector3.Distance(_pickup.transform.position, playerHealth.transform.position) > settings.pickupDistance)
+        {
+            return 0;
+        }
+        if (!EnemySight.ClearSegment(_pickup.CollectionPoint, EnemySight.TargetCenter(playerHealth), playerHealth, _pickup.transform, 0f) ||
+            !_pickup.TryClaim())
+        {
+            return 0;
+        }
+        int added = ammo.Add(_pickup.AmmoId, _pickup.Amount);
+        if (added <= 0)
+        {
+            _pickup.ReleaseClaim();
+            return 0;
+        }
+        ammoDrops.Remove(_pickup);
+        _pickup.Remove();
+        return added;
+    }
+
+    private void ClearAmmoDrops()
+    {
+        foreach (var drop in ammoDrops)
+        {
+            if (drop != null)
+            {
+                drop.Remove();
+            }
+        }
+        ammoDrops.Clear();
     }
 
     private void OnEnemiesCleared()

@@ -62,6 +62,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     public int Reward => stats != null ? stats.reward : 0;
     // 들고 있는 무기 id. 근접 적은 항상 빈 문자열이다.
     public string WeaponId => weapon != null ? weapon.id : "";
+    public string DropAmmoId => weapon != null ? weapon.dropAmmoId : "";
 
     public event Action<Enemy> Died;
 

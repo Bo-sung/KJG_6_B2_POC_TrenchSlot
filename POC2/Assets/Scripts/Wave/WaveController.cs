@@ -242,7 +242,10 @@ public sealed class WaveController : MonoBehaviour
     private void OnEnemyDied(Enemy _enemy)
     {
         _enemy.Died -= OnEnemyDied;
-        alive.Remove(_enemy);
+        if (!alive.Remove(_enemy))
+        {
+            return;
+        }
         EnemyKilled?.Invoke(_enemy);
     }
 }
