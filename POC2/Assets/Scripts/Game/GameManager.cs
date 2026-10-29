@@ -46,6 +46,7 @@ public sealed class GameManager : MonoBehaviour
     private PerkInventory perks;
     private WeaponLoadout loadout;
     private AmmoInventory ammo;
+    private AmmoShop ammoShop;
     private GamePhase phase;
     private WaveSpec currentWave;
     private float waveTimeLeft;
@@ -92,6 +93,7 @@ public sealed class GameManager : MonoBehaviour
         perks = new PerkInventory(table.Perk);
         loadout = new WeaponLoadout(WeaponInfo.StartWeaponId(table.Weapon));
         ammo = new AmmoInventory(table.Ammo);
+        ammoShop = new AmmoShop(table.Shop, ammo, wallet);
         if (ammoPickupPrefab == null)
         {
             var prefab = Resources.Load<GameObject>(AMMO_PICKUP_PATH);
@@ -338,6 +340,12 @@ public sealed class GameManager : MonoBehaviour
             return "정비 시간에만 구매할 수 있습니다.";
         }
 
+        _item = ShopInfo.Find(TableManager.Instance.Shop, _item.id);
+        if (_item == null)
+        {
+            return "등록된 상품이 아닙니다.";
+        }
+
         switch (_item.type)
         {
             case ShopInfo.TYPE_WEAPON:
@@ -346,6 +354,8 @@ public sealed class GameManager : MonoBehaviour
                 return BuyHeal(_item);
             case ShopInfo.TYPE_PERK:
                 return BuyPerk(_item);
+            case ShopInfo.TYPE_AMMO:
+                return ammoShop.TryBuy(_item.id);
             default:
                 return "알 수 없는 항목입니다.";
         }

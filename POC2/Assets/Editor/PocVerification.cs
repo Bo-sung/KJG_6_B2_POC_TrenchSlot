@@ -228,7 +228,7 @@ public static class PocVerification
         Check(loadout.Equip("bolt") && loadout.EquippedId == "bolt", "owned weapon equips freely");
         Check(!loadout.Equip("smg") && loadout.EquippedId == "bolt", "unowned weapon cannot equip");
 
-        Check(table.Shop.items.Length == 7, "shop has 7 slots");
+        Check(table.Shop.items.Length == 11, "shop has seven existing items and four ammo items");
         Check(table.GameConfig.maxHealth == 100 && table.GameConfig.startMoney == 50, "game config loaded");
         Check(table.Weapon.weapons.Length == 3 && WeaponInfo.StartWeaponId(table.Weapon) == "revolver", "three weapons, revolver starts");
         var startRevolver = WeaponInfo.Find(table.Weapon, WeaponInfo.StartWeaponId(table.Weapon));

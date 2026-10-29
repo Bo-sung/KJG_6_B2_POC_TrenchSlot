@@ -54,6 +54,7 @@ public sealed class TableManager
 
         Shop = Load<ShopData>(nameof(ShopData));
         ShopInfo.Validate(Shop);
+        ShopInfo.ValidateAmmo(Shop, Ammo);
 
         Perk = Load<PerkData>(nameof(PerkData));
         PerkInfo.Validate(Perk);

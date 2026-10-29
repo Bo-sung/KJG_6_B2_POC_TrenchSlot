@@ -1,3 +1,4 @@
+using System.Text;
 using UnityEngine;
 
 // 정비 상점 규칙(Presenter). 정비 시간에만 열리며, 열리는 동안 마우스 커서를 풀어 둔다.
@@ -8,11 +9,21 @@ public sealed class ShopPresenter : MonoBehaviour
     [SerializeField] private GameManager gameManager;
 
     private ShopData.Item[] items;
+    private AmmoInventory ammo;
 
     private void Start()
     {
         var shop = TableManager.Instance.Shop;
         items = shop != null && shop.items != null ? shop.items : new ShopData.Item[0];
+        ammo = gameManager.Ammo;
+        if (ammo != null)
+        {
+            ammo.Changed += OnAmmoChanged;
+        }
+        if (view.SlotCount != items.Length)
+        {
+            Debug.LogError("상점 프리팹 칸 수와 상품 테이블 길이가 다릅니다.");
+        }
 
         view.SlotClicked += OnSlotClicked;
         view.NextWaveClicked += OnNextWaveClicked;
@@ -28,6 +39,10 @@ public sealed class ShopPresenter : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (ammo != null)
+        {
+            ammo.Changed -= OnAmmoChanged;
+        }
         if (view != null)
         {
             view.SlotClicked -= OnSlotClicked;
@@ -101,12 +116,41 @@ public sealed class ShopPresenter : MonoBehaviour
         view.SetMessage($"WAVE {gameManager.WaveNumber} 완료 · HP +{gameManager.WaveHealthRestored:0.##} · 보너스 +${gameManager.WaveBonusPaid:N0}");
     }
 
+    private void OnAmmoChanged(string _id, int _reserve, int _maximum)
+    {
+        RefreshSlots();
+    }
+
+    private void RefreshAmmo()
+    {
+        var text = new StringBuilder("보유 탄약\n\n");
+        var table = TableManager.Instance.Ammo;
+        if (ammo != null && table != null && table.ammoTypes != null)
+        {
+            foreach (var entry in table.ammoTypes)
+            {
+                if (entry != null)
+                {
+                    text.AppendLine($"{entry.name}  {ammo.GetReserve(entry.id)} / {ammo.GetMaximum(entry.id)}");
+                }
+            }
+        }
+        view.SetAmmoSummary(text.ToString());
+    }
+
     private void RefreshSlots()
     {
-        for (int i = 0; i < view.SlotCount && i < items.Length; i++)
+        RefreshAmmo();
+        for (int i = 0; i < view.SlotCount; i++)
         {
+            if (i >= items.Length || items[i] == null)
+            {
+                view.SetSlot(i, "", "", false);
+                continue;
+            }
             RenderSlot(i, items[i]);
         }
+        view.EnsureValidSelection();
     }
 
     private void RenderSlot(int _index, ShopData.Item _item)
@@ -118,6 +162,13 @@ public sealed class ShopPresenter : MonoBehaviour
 
         switch (_item.type)
         {
+            case ShopInfo.TYPE_AMMO:
+                label += "\n최대량까지 보충";
+                if (!ShopInfo.CanRefill(ammo, _item.target))
+                {
+                    price = "최대";
+                }
+                break;
             case ShopInfo.TYPE_WEAPON:
                 if (gameManager.Loadout.IsEquipped(_item.target))
                 {
@@ -159,6 +210,8 @@ public sealed class ShopPresenter : MonoBehaviour
     {
         switch (_item.type)
         {
+            case ShopInfo.TYPE_AMMO:
+                return ShopInfo.CanRefill(ammo, _item.target) && _affordable;
             case ShopInfo.TYPE_WEAPON:
                 if (gameManager.Loadout.IsOwned(_item.target))
                 {
