@@ -52,6 +52,7 @@ public sealed class HudView : MonoBehaviour
     {
         healthBaseColor = healthFill.color;
         ammoBaseColor = ammoText.color;
+        ammoText.verticalAlignment = VerticalAlignmentOptions.Bottom;
         if (damageFlash != null)
         {
             damageFlash.color = new Color(damageFlash.color.r, damageFlash.color.g, damageFlash.color.b, 0f);
@@ -97,17 +98,19 @@ public sealed class HudView : MonoBehaviour
         timerText.text = $"{Mathf.CeilToInt(_left)}초";
     }
 
-    public void SetAmmo(int _ammo, int _magazine, bool _reloading, float _reloadProgress)
+    public void SetAmmo(int _ammo, int _reserve, bool _reloading, float _reloadProgress)
     {
+        string count = $"{_ammo} / {_reserve}";
         if (_reloading)
         {
-            ammoText.text = $"재장전 {Mathf.FloorToInt(Mathf.Clamp01(_reloadProgress) * 100f)}%";
+            ammoText.text = $"<size=60%>재장전 {Mathf.FloorToInt(Mathf.Clamp01(_reloadProgress) * 100f)}%</size>\n{count}";
             ammoText.color = ammoBaseColor;
             return;
         }
         bool empty = _ammo <= 0;
-        ammoText.text = empty ? EMPTY_PROMPT : $"{_ammo} / {_magazine}";
-        ammoText.color = empty ? EMPTY_AMMO_COLOR : ammoBaseColor;
+        string status = _reserve <= 0 ? "예비탄 없음" : (empty ? EMPTY_PROMPT : " ");
+        ammoText.text = $"<size=60%>{status}</size>\n{count}";
+        ammoText.color = empty || _reserve <= 0 ? EMPTY_AMMO_COLOR : ammoBaseColor;
     }
 
     public void SetKills(int _kills)

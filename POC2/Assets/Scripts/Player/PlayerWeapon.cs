@@ -34,6 +34,11 @@ public sealed class PlayerWeapon : MonoBehaviour
     private float nextShotTime;
     private float reloadEndTime;
     private bool isReloading;
+    private bool configured;
+    private AmmoInventory inventory;
+
+    public string AmmoId { get; private set; }
+    public int ReserveAmmo => inventory != null ? inventory.GetReserve(AmmoId) : 0;
 
     public int Ammo { get; private set; }
     public int MagazineSize => settings.magazineSize;
@@ -57,7 +62,10 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     private void Awake()
     {
-        Ammo = Mathf.Max(0, settings.magazineSize);
+        if (!configured)
+        {
+            Ammo = Mathf.Max(0, settings.magazineSize);
+        }
     }
 
     private void OnEnable()
@@ -69,6 +77,7 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelReload();
         fireAction?.action?.Disable();
         reloadAction?.action?.Disable();
         pickupAction?.action?.Disable();
@@ -78,19 +87,20 @@ public sealed class PlayerWeapon : MonoBehaviour
     {
         if (health != null && !health.IsAlive)
         {
-            isReloading = false;
+            CancelReload();
             return;
         }
 
         // 정비 상점·게임 오버 중에는 사격·재장전을 막는다. 슬롯 회전 중에는 막지 않는다.
         if (!InputGate.PlayerEnabled)
         {
+            CancelReload();
             return;
         }
 
         if (isReloading && Time.time >= reloadEndTime)
         {
-            RefillImmediately();
+            CompleteReload();
         }
 
         bool wantsReload = reloadAction != null && reloadAction.action != null && reloadAction.action.WasPressedThisFrame();
@@ -127,11 +137,19 @@ public sealed class PlayerWeapon : MonoBehaviour
     // 바닥 픽업을 주운 경우 놓을 때의 탄약을 그대로 이어받는다. 재장전은 취소하고 탄약은 채우지 않는다.
     public void Configure(WeaponSettings _settings, int _ammo)
     {
+        configured = true;
         settings = _settings;
         isReloading = false;
         nextShotTime = 0f;
         Ammo = Mathf.Clamp(_ammo, 0, Mathf.Max(0, settings.magazineSize));
         AmmoChanged?.Invoke(Ammo, settings.magazineSize);
+    }
+
+    public void Configure(WeaponSettings _settings, int _ammo, AmmoInventory _inventory, string _ammoId)
+    {
+        inventory = _inventory;
+        AmmoId = _ammoId;
+        Configure(_settings, _ammo);
     }
 
     // 이번 프레임 줍기 예약 여부. 이전 프레임 조준 캐시가 아니라 이번 프레임의 픽업 키 입력과 조준으로 정해진다.
@@ -143,12 +161,18 @@ public sealed class PlayerWeapon : MonoBehaviour
     // 무기를 내려놓을 때 재장전을 끊는다. 진행 중이던 재장전은 완료되지 않으며 탄약 이득도 없다.
     public void CancelReload()
     {
+        if (!isReloading)
+        {
+            return;
+        }
         isReloading = false;
+        AmmoChanged?.Invoke(Ammo, settings.magazineSize);
     }
 
     public void StartReload()
     {
-        if ((health != null && !health.IsAlive) || isReloading || settings.magazineSize <= 0 || Ammo >= settings.magazineSize)
+        if (!InputGate.PlayerEnabled || (health != null && !health.IsAlive) || isReloading ||
+            settings.magazineSize <= 0 || Ammo >= settings.magazineSize || ReserveAmmo <= 0)
         {
             return;
         }
@@ -157,13 +181,34 @@ public sealed class PlayerWeapon : MonoBehaviour
         reloadEndTime = Time.time + Mathf.Max(0f, settings.reloadSeconds);
         if (settings.reloadSeconds <= 0f)
         {
-            RefillImmediately();
+            CompleteReload();
+        }
+        else
+        {
+            AmmoChanged?.Invoke(Ammo, settings.magazineSize);
         }
     }
 
-    public void RefillImmediately()
+    private void CompleteReload()
     {
+        if (!isReloading)
+        {
+            return;
+        }
         isReloading = false;
+        if (inventory != null)
+        {
+            Ammo += inventory.Consume(AmmoId, Mathf.Max(0, settings.magazineSize - Ammo));
+        }
+        AmmoChanged?.Invoke(Ammo, settings.magazineSize);
+    }
+
+    public void GrantSlotAmmo()
+    {
+        if (health != null && !health.IsAlive)
+        {
+            return;
+        }
         Ammo = Mathf.Max(0, settings.magazineSize);
         AmmoChanged?.Invoke(Ammo, settings.magazineSize);
     }

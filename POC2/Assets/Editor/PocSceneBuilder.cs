@@ -105,7 +105,8 @@ public static class PocSceneBuilder
         var timer = PocAssetBuilder.Label(root, "Timer", "0초", 40, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(400f, 50f));
         var money = PocAssetBuilder.Label(root, "Money", "소지금", 40, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(600f, 50f));
         var kills = PocAssetBuilder.Label(root, "Kills", "처치 0", 32, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -100f), new Vector2(600f, 40f));
-        var ammo = PocAssetBuilder.Label(root, "Ammo", "6 / 6", 56, TextAlignmentOptions.Left, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(500f, 80f));
+        var ammo = PocAssetBuilder.Label(root, "Ammo", "-- / --", 56, TextAlignmentOptions.Left, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(600f, 140f));
+        ammo.verticalAlignment = VerticalAlignmentOptions.Bottom;
         var prompt = PocAssetBuilder.Label(root, "Prompt", "", 36, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -140f), new Vector2(1000f, 60f));
 
         var bannerObject = PocAssetBuilder.UiObject("Banner", root);

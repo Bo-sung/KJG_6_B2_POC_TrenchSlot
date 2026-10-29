@@ -325,11 +325,13 @@ public static class PocVerification
             CheckSerializedRefs(new SerializedObject(hud), "game scene HudView", HUD_REFS);
             var ammoLabel = new SerializedObject(hud).FindProperty("ammoText").objectReferenceValue as TMPro.TMP_Text;
             hud.SetAmmo(0, 6, false, 0f);
-            Check(ammoLabel != null && ammoLabel.text == "빈 탄창 · R 재장전", "empty magazine shows reload prompt");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>빈 탄창 · R 재장전</size>\n0 / 6", "empty magazine shows count and reload prompt above");
             hud.SetAmmo(3, 6, false, 0f);
-            Check(ammoLabel != null && ammoLabel.text == "3 / 6", "loaded magazine shows count");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%> </size>\n3 / 6", "loaded magazine reserves status row above count");
             hud.SetAmmo(0, 6, true, 0.5f);
-            Check(ammoLabel != null && ammoLabel.text == "재장전 50%", "reload shows progress percent");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>재장전 50%</size>\n0 / 6", "reload progress is above count");
+            hud.SetAmmo(0, 0, false, 0f);
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>예비탄 없음</size>\n0 / 0", "no reserve does not offer reload");
         }
         Check(typeof(PlayerWeapon).GetEvent("EnemyHit") != null, "PlayerWeapon exposes EnemyHit confirmed-hit event");
         Check(typeof(PlayerWeapon).GetProperty("ReloadProgress") != null, "PlayerWeapon exposes ReloadProgress");

@@ -209,6 +209,10 @@ public sealed class GameManager : MonoBehaviour
 
     private void SetPhase(GamePhase _next)
     {
+        if (_next != GamePhase.Wave && weapon != null)
+        {
+            weapon.CancelReload();
+        }
         phase = _next;
         PhaseChanged?.Invoke(phase);
     }
@@ -435,7 +439,7 @@ public sealed class GameManager : MonoBehaviour
             projectileSpeed = entry.projectileSpeed,
             projectileLifetime = entry.projectileLifetime,
             projectileRadius = entry.projectileRadius
-        }, _ammo);
+        }, _ammo, ammo, entry.ammoId);
         if (heldModels != null)
         {
             heldModels.Show(_weaponId);
