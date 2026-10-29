@@ -29,6 +29,21 @@ public static class EnemyWeaponInfo
         return Find(_table, _waveWeaponId);
     }
 
+    public static void ValidateAmmo(EnemyWeaponData _table, AmmoData _ammo)
+    {
+        if (_table == null || _table.weapons == null)
+        {
+            return;
+        }
+        foreach (var weapon in _table.weapons)
+        {
+            if (weapon != null && AmmoInfo.Find(_ammo, weapon.dropAmmoId) == null)
+            {
+                Debug.LogError($"적 무기 {weapon.id}의 드롭 탄종 참조가 올바르지 않습니다: {weapon.dropAmmoId}");
+            }
+        }
+    }
+
     public static void Validate(EnemyWeaponData _table)
     {
         if (_table == null || _table.weapons == null || _table.weapons.Length == 0)

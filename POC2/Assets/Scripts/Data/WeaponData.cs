@@ -8,6 +8,7 @@ public sealed class WeaponData
     public sealed class Entry
     {
         public string id;
+        public string ammoId;
         public string name;
         public int magazineSize;
         public float damage;

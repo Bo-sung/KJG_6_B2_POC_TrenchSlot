@@ -6,6 +6,10 @@
     { "id": "perk_discount", "type": "perk", "target": "discountLever", "label": "할인 레버", "price": 120 },
     { "id": "perk_kill", "type": "perk", "target": "killStack", "label": "킬 스택", "price": 100 },
     { "id": "perk_spindle", "type": "perk", "target": "fastSpindle", "label": "고속 스핀들", "price": 120 },
-    { "id": "perk_ammo", "type": "perk", "target": "ammoSymbol", "label": "탄약 심볼", "price": 100 }
+    { "id": "perk_ammo", "type": "perk", "target": "ammoSymbol", "label": "탄약 심볼", "price": 100 },
+    { "id": "ammo_pistol", "type": "ammo", "target": "pistol", "label": "권총 탄약 보충", "price": 200 },
+    { "id": "ammo_sniper", "type": "ammo", "target": "sniper", "label": "저격 탄약 보충", "price": 200 },
+    { "id": "ammo_smg", "type": "ammo", "target": "smg", "label": "기관단총 탄약 보충", "price": 200 },
+    { "id": "ammo_shotgun", "type": "ammo", "target": "shotgun", "label": "샷건 탄약 보충", "price": 200 }
   ]
 }

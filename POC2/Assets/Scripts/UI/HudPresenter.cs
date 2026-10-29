@@ -17,6 +17,7 @@ public sealed class HudPresenter : MonoBehaviour
     private GameConfigData feedbackConfig;
     private string interactionPrompt;
     private string pickupPrompt;
+    private AmmoInventory ammoInventory;
 
     private void Start()
     {
@@ -36,6 +37,11 @@ public sealed class HudPresenter : MonoBehaviour
             gameManager.GameOver += OnGameOver;
             OnMoneyChanged(gameManager.Wallet.Balance);
             OnKillsChanged(gameManager.KillsThisWave);
+            ammoInventory = gameManager.Ammo;
+            if (ammoInventory != null)
+            {
+                ammoInventory.Changed += OnReserveChanged;
+            }
         }
         if (playerHealth != null)
         {
@@ -55,6 +61,8 @@ public sealed class HudPresenter : MonoBehaviour
         if (weapon != null)
         {
             weapon.EnemyHit += view.ShowHitMarker;
+            weapon.AmmoChanged += OnAmmoChanged;
+            RefreshAmmo();
         }
         if (gameManager != null && gameManager.CurrentWave.wave > 0)
         {
@@ -64,6 +72,10 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (ammoInventory != null)
+        {
+            ammoInventory.Changed -= OnReserveChanged;
+        }
         if (gameManager != null)
         {
             gameManager.WaveStarted -= OnWaveStarted;
@@ -91,15 +103,37 @@ public sealed class HudPresenter : MonoBehaviour
         if (weapon != null)
         {
             weapon.EnemyHit -= view.ShowHitMarker;
+            weapon.AmmoChanged -= OnAmmoChanged;
         }
     }
 
     private void Update()
     {
         UpdateDamageDirection(Time.deltaTime);
-        if (weapon != null)
+        if (weapon != null && weapon.IsReloading)
         {
-            view.SetAmmo(weapon.Ammo, weapon.MagazineSize, weapon.IsReloading, weapon.ReloadProgress);
+            RefreshAmmo();
+        }
+    }
+
+    private void OnAmmoChanged(int _ammo, int _magazine)
+    {
+        RefreshAmmo();
+    }
+
+    private void OnReserveChanged(string _id, int _reserve, int _maximum)
+    {
+        if (weapon != null && weapon.AmmoId == _id)
+        {
+            RefreshAmmo();
+        }
+    }
+
+    private void RefreshAmmo()
+    {
+        if (weapon != null && view != null)
+        {
+            view.SetAmmo(weapon.Ammo, weapon.ReserveAmmo, weapon.IsReloading, weapon.ReloadProgress);
         }
     }
 

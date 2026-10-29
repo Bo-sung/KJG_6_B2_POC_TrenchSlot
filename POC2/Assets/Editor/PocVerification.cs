@@ -228,7 +228,7 @@ public static class PocVerification
         Check(loadout.Equip("bolt") && loadout.EquippedId == "bolt", "owned weapon equips freely");
         Check(!loadout.Equip("smg") && loadout.EquippedId == "bolt", "unowned weapon cannot equip");
 
-        Check(table.Shop.items.Length == 7, "shop has 7 slots");
+        Check(table.Shop.items.Length == 11, "shop has seven existing items and four ammo items");
         Check(table.GameConfig.maxHealth == 100 && table.GameConfig.startMoney == 50, "game config loaded");
         Check(table.Weapon.weapons.Length == 3 && WeaponInfo.StartWeaponId(table.Weapon) == "revolver", "three weapons, revolver starts");
         var startRevolver = WeaponInfo.Find(table.Weapon, WeaponInfo.StartWeaponId(table.Weapon));
@@ -325,11 +325,13 @@ public static class PocVerification
             CheckSerializedRefs(new SerializedObject(hud), "game scene HudView", HUD_REFS);
             var ammoLabel = new SerializedObject(hud).FindProperty("ammoText").objectReferenceValue as TMPro.TMP_Text;
             hud.SetAmmo(0, 6, false, 0f);
-            Check(ammoLabel != null && ammoLabel.text == "빈 탄창 · R 재장전", "empty magazine shows reload prompt");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>빈 탄창 · R 재장전</size>\n0 / 6", "empty magazine shows count and reload prompt above");
             hud.SetAmmo(3, 6, false, 0f);
-            Check(ammoLabel != null && ammoLabel.text == "3 / 6", "loaded magazine shows count");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%> </size>\n3 / 6", "loaded magazine reserves status row above count");
             hud.SetAmmo(0, 6, true, 0.5f);
-            Check(ammoLabel != null && ammoLabel.text == "재장전 50%", "reload shows progress percent");
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>재장전 50%</size>\n0 / 6", "reload progress is above count");
+            hud.SetAmmo(0, 0, false, 0f);
+            Check(ammoLabel != null && ammoLabel.text == "<size=60%>예비탄 없음</size>\n0 / 0", "no reserve does not offer reload");
         }
         Check(typeof(PlayerWeapon).GetEvent("EnemyHit") != null, "PlayerWeapon exposes EnemyHit confirmed-hit event");
         Check(typeof(PlayerWeapon).GetProperty("ReloadProgress") != null, "PlayerWeapon exposes ReloadProgress");
@@ -447,6 +449,14 @@ public static class PocVerification
                 Check(gm.Phase == GameManager.GamePhase.Wave && gm.WaveNumber == 1, "wave 1 starts automatically");
                 Check(waves.AliveCount > 0 || !waves.AllSpawned, "enemies spawn during wave 1");
                 Check(weapon.MagazineSize == 6 && weapon.Ammo == 6, $"player starts with six-round revolver in scene (ammo {weapon.Ammo}/{weapon.MagazineSize})");
+                Check(weapon.AmmoId == "pistol" && weapon.ReserveAmmo == 36,
+                    "starting revolver uses pistol reserve separately from its loaded magazine");
+                foreach (var ammoEntry in TableManager.Instance.Ammo.ammoTypes)
+                {
+                    Check(gm.Ammo.GetReserve(ammoEntry.id) == ammoEntry.startingReserve &&
+                          gm.Ammo.GetMaximum(ammoEntry.id) == ammoEntry.maxReserve,
+                        $"new Game scene initializes {ammoEntry.id} reserve and capacity from AmmoData");
+                }
                 int rusherGuns = 0;
                 int riflemanWrongGun = 0;
                 foreach (var enemy in UnityEngine.Object.FindObjectsByType<Enemy>(FindObjectsSortMode.None))

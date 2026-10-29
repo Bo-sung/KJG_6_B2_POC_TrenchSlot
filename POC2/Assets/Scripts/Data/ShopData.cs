@@ -8,9 +8,9 @@ public sealed class ShopData
     public sealed class Item
     {
         public string id;
-        // weapon | heal | perk
+        // weapon | heal | perk | ammo
         public string type;
-        // weapon은 무기 id, perk는 퍽 id, heal은 비워 둔다.
+        // weapon은 무기 id, perk는 퍽 id, ammo는 탄종 id, heal은 비워 둔다.
         public string target;
         public string label;
         public int price;

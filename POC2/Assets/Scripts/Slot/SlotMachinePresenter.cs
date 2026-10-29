@@ -103,6 +103,10 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
 
     private void OnSpinStopped(SlotOutcome _outcome)
     {
+        if (!spinning)
+        {
+            return;
+        }
         spinning = false;
         var text = new StringBuilder();
         int payout = 0;
@@ -111,7 +115,7 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         {
             if (weapon != null)
             {
-                weapon.RefillImmediately();
+                weapon.GrantSlotAmmo();
             }
             SoundPlayer.Play(SfxType.AmmoRefill);
             text.Append("탄약 보급! ");

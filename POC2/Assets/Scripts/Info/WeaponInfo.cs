@@ -42,6 +42,21 @@ public static class WeaponInfo
         return _table != null ? _table.drop : null;
     }
 
+    public static void ValidateAmmo(WeaponData _table, AmmoData _ammo)
+    {
+        if (_table == null || _table.weapons == null)
+        {
+            return;
+        }
+        foreach (var weapon in _table.weapons)
+        {
+            if (weapon != null && AmmoInfo.Find(_ammo, weapon.ammoId) == null)
+            {
+                Debug.LogError($"무기 {weapon.id}의 탄종 참조가 올바르지 않습니다: {weapon.ammoId}");
+            }
+        }
+    }
+
     public static void Validate(WeaponData _table)
     {
         if (_table == null || _table.weapons == null || _table.weapons.Length == 0)

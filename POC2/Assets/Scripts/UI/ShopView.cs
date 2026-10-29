@@ -12,6 +12,7 @@ public sealed class ShopView : MonoBehaviour
     [SerializeField] private TMP_Text walletText;
     [SerializeField] private TMP_Text intermissionText;
     [SerializeField] private TMP_Text messageText;
+    [SerializeField] private TMP_Text ammoSummaryText;
     [SerializeField] private Button nextWaveButton;
     [SerializeField] private Button[] slotButtons;
     [SerializeField] private TMP_Text[] slotLabels;
@@ -74,6 +75,29 @@ public sealed class ShopView : MonoBehaviour
     public void SetMessage(string _message)
     {
         messageText.text = _message;
+    }
+
+    public void SetAmmoSummary(string _text)
+    {
+        if (ammoSummaryText != null)
+        {
+            ammoSummaryText.text = _text;
+        }
+    }
+
+    public void EnsureValidSelection()
+    {
+        if (panel == null || !panel.activeInHierarchy || EventSystem.current == null || nextWaveButton == null)
+        {
+            return;
+        }
+        var selected = EventSystem.current.currentSelectedGameObject;
+        var control = selected != null ? selected.GetComponent<Selectable>() : null;
+        if (selected == null || (selected.transform.IsChildOf(panel.transform) &&
+            (control == null || !control.IsInteractable() || !control.IsActive())))
+        {
+            EventSystem.current.SetSelectedGameObject(nextWaveButton.gameObject);
+        }
     }
 
     public void SetSlot(int _index, string _label, string _price, bool _interactable)

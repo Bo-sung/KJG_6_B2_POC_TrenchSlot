@@ -85,11 +85,50 @@ public static class PocWeaponDropVerification
         Check(weapon.Ammo == 2, "주운 무기는 저장된 탄약을 그대로 이어받는다");
         weapon.Configure(settings, 99);
         Check(weapon.Ammo == 6, "저장 탄약이 탄창을 넘으면 탄창으로 제한한다");
-        weapon.Configure(settings, 3);
-        weapon.StartReload();
-        Check(weapon.IsReloading, "재장전 시작");
-        weapon.CancelReload();
-        Check(!weapon.IsReloading && weapon.Ammo == 3, "재장전 취소 후 탄약은 채워지지 않는다");
+        var ammoTable = JsonUtility.FromJson<AmmoData>(Resources.Load<TextAsset>("AmmoData").text);
+        var inventory = new AmmoInventory(ammoTable);
+        bool playerEnabled = InputGate.PlayerEnabled;
+        InputGate.PlayerEnabled = true;
+        try
+        {
+            int reserve = inventory.GetReserve("pistol");
+            weapon.Configure(settings, 3, inventory, "pistol");
+            weapon.StartReload();
+            Check(weapon.IsReloading && weapon.ReserveAmmo == reserve, "예비탄이 있으면 소비 없이 재장전을 시작한다");
+            weapon.CancelReload();
+            Check(!weapon.IsReloading && weapon.Ammo == 3 && weapon.ReserveAmmo == reserve,
+                "재장전 취소 후 장전탄과 예비탄은 유지된다");
+
+            weapon.StartReload();
+            FieldInfo reloadEndTime = typeof(PlayerWeapon).GetField("reloadEndTime", BindingFlags.NonPublic | BindingFlags.Instance);
+            float endTime = (float)reloadEndTime.GetValue(weapon);
+            weapon.GrantSlotAmmo();
+            Check(weapon.Ammo == 6 && weapon.ReserveAmmo == reserve && weapon.IsReloading,
+                "슬롯은 탄창만 무료로 채우고 예비탄과 진행 중 재장전을 유지한다");
+            Check((float)reloadEndTime.GetValue(weapon) == endTime, "슬롯은 재장전 종료 시각을 변경하지 않는다");
+            MethodInfo completeReload = typeof(PlayerWeapon).GetMethod("CompleteReload", BindingFlags.NonPublic | BindingFlags.Instance);
+            completeReload.Invoke(weapon, null);
+            Check(!weapon.IsReloading && weapon.Ammo == 6 && weapon.ReserveAmmo == reserve,
+                "슬롯으로 가득 찬 탄창의 재장전 완료는 예비탄을 소비하지 않는다");
+
+            settings.reloadSeconds = 0f;
+            weapon.Configure(settings, 2, inventory, "pistol");
+            weapon.StartReload();
+            Check(!weapon.IsReloading && weapon.Ammo == 6 && weapon.ReserveAmmo == reserve - 4,
+                "재장전 완료는 부족한 장전탄만큼 예비탄을 소비한다");
+            inventory.Consume("pistol", int.MaxValue);
+            inventory.Add("pistol", 2);
+            weapon.Configure(settings, 1, inventory, "pistol");
+            weapon.StartReload();
+            Check(weapon.Ammo == 3 && weapon.ReserveAmmo == 0, "부족한 예비탄만큼만 장전한다");
+            weapon.StartReload();
+            Check(!weapon.IsReloading && weapon.Ammo == 3 && weapon.ReserveAmmo == 0,
+                "예비탄이 없으면 재장전과 탄약 생성이 발생하지 않는다");
+        }
+        finally
+        {
+            InputGate.PlayerEnabled = playerEnabled;
+        }
 
         // X 컨텍스트 주움 우선순위는 이번 프레임의 픽업 키 입력 + 이번 프레임 조준으로 정한 예약(PickupClaimThisFrame)만 본다.
         // 조준 가능한 유효 픽업이 있어도 이번 프레임에 픽업 키가 눌리지 않았으면 재장전을 막지 않는다(R·대상 없는 X는 재장전).
