@@ -1,0 +1,9 @@
+{
+  "status": "provisional",
+  "ammoTypes": [
+    { "id": "pistol", "name": "권총 탄약", "color": "#F38D11", "referenceMagazineSize": 6, "maxReserve": 60, "startingReserve": 36 },
+    { "id": "sniper", "name": "저격 탄약", "color": "#F3D111", "referenceMagazineSize": 5, "maxReserve": 50, "startingReserve": 30 },
+    { "id": "smg", "name": "기관단총 탄약", "color": "#89F311", "referenceMagazineSize": 30, "maxReserve": 300, "startingReserve": 180 },
+    { "id": "shotgun", "name": "샷건 탄약", "color": "#89F311", "referenceMagazineSize": 2, "maxReserve": 20, "startingReserve": 12 }
+  ]
+}
