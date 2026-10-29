@@ -40,6 +40,7 @@ public sealed class GameManager : MonoBehaviour
     private PlayerWallet wallet;
     private PerkInventory perks;
     private WeaponLoadout loadout;
+    private AmmoInventory ammo;
     private GamePhase phase;
     private WaveSpec currentWave;
     private float waveTimeLeft;
@@ -62,6 +63,7 @@ public sealed class GameManager : MonoBehaviour
     public PlayerWallet Wallet => wallet;
     public PerkInventory Perks => perks;
     public WeaponLoadout Loadout => loadout;
+    public AmmoInventory Ammo => ammo;
     public bool IsWaveActive => phase == GamePhase.Wave;
     // 지금 체력 회복을 살 수 있는지(살아 있고 최대 체력 미만). 상점 칸 활성 상태와 구매 판정이 같이 쓴다.
     public bool CanHeal => playerHealth != null && playerHealth.IsAlive && ShopInfo.CanHeal(playerHealth.CurrentHealth, playerHealth.MaxHealth);
@@ -84,6 +86,7 @@ public sealed class GameManager : MonoBehaviour
         wallet = new PlayerWallet(GameConfigInfo.StartMoney(config));
         perks = new PerkInventory(table.Perk);
         loadout = new WeaponLoadout(WeaponInfo.StartWeaponId(table.Weapon));
+        ammo = new AmmoInventory(table.Ammo);
 
         if (playerHealth != null)
         {
