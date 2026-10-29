@@ -1,0 +1,8 @@
+{
+  "status": "provisional",
+  "weapons": [
+    { "id": "musket", "name": "머스켓", "era": "MUSKET", "attackDamage": 8, "attackRange": 30, "attackInterval": 2.5, "projectileSpeed": 60, "projectileLifetime": 1.0, "projectileRadius": 0.05 },
+    { "id": "wwi_rifle", "name": "WWI 볼트액션 소총", "era": "WWI", "attackDamage": 8, "attackRange": 40, "attackInterval": 1.6, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.05 },
+    { "id": "wwii_rifle", "name": "WWII 소총", "era": "WWII", "attackDamage": 8, "attackRange": 50, "attackInterval": 1.2, "projectileSpeed": 80, "projectileLifetime": 1.0, "projectileRadius": 0.05 }
+  ]
+}

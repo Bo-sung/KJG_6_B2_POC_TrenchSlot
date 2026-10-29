@@ -1,0 +1,35 @@
+{
+  "high": {
+    "executor": "claude",
+    "model": "opus",
+    "fallback": [
+      { "executor": "opencode", "model": "openai/gpt-6.1-sol", "verified": true },
+      { "executor": "antigravity", "model": "gemini-4-argon-high", "verified": true },
+      { "executor": "antigravity", "model": "gemini-3.8-flash-high", "verified": true }
+    ]
+  },
+  "medium": {
+    "executor": "opencode",
+    "model": "openai/gpt-6-luna",
+    "fallback": [
+      { "executor": "qoder", "model": "DeepSeek-Flash", "verified": false },
+      { "executor": "antigravity", "model": "gemini-3.8-flash-medium", "verified": true }
+    ]
+  },
+  "low": {
+    "executor": "pi",
+    "model": "krafton/raon-1-mini-preview",
+    "provider": "krafton",
+    "verified": true,
+    "fallback": [
+      { "executor": "pi", "model": "dgx-spark/qwen3.8-flash-next", "verified": true }
+    ]
+  },
+  "long_running": {
+    "executor": "pi",
+    "model": "dgx-spark/qwen3.8-flash-next",
+    "verified": true,
+    "fallback": []
+  },
+  "max_parallel": 6
+}

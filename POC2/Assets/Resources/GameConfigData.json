@@ -1,0 +1,10 @@
+{
+  "maxHealth": 100,
+  "startMoney": 50,
+  "healAmount": 30,
+  "waveClearHealAmount": 20,
+  "waveClearBonusBase": 100,
+  "waveClearBonusPerWave": 10,
+  "intermissionSeconds": 30,
+  "interactDistance": 4
+}

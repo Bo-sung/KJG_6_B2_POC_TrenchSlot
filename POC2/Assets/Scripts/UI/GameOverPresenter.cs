@@ -1,0 +1,42 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+// 게임 오버 규칙(Presenter). 플레이어 사망 시 결과를 보여 주고 타이틀 씬으로 돌아간다.
+public sealed class GameOverPresenter : MonoBehaviour
+{
+    [SerializeField] private GameOverView view;
+    [SerializeField] private GameManager gameManager;
+
+    private void Start()
+    {
+        gameManager.GameOver += OnGameOver;
+        view.TitleClicked += OnTitleClicked;
+    }
+
+    private void OnDestroy()
+    {
+        if (gameManager != null)
+        {
+            gameManager.GameOver -= OnGameOver;
+        }
+        if (view != null)
+        {
+            view.TitleClicked -= OnTitleClicked;
+        }
+    }
+
+    private void OnGameOver(int _wave, int _kills)
+    {
+        view.SetSummary(_wave, _kills);
+        view.SetVisible(true);
+        InputGate.PlayerEnabled = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    private void OnTitleClicked()
+    {
+        SoundPlayer.Play(SfxType.Click);
+        SceneManager.LoadScene(SceneNames.TITLE);
+    }
+}

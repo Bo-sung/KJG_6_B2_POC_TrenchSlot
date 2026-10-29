@@ -1,0 +1,50 @@
+# Unity-generated local state (Unity project lives in POC2/).
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Mm]emoryCaptures/
+**/[Rr]ecordings/
+**/TestResults/
+**/TestResults*.xml
+**/test-results*.xml
+**/crash-report*/
+
+# IDE-generated files; retain .vsconfig as project tooling configuration.
+.vs/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.opendb
+*.VC.db
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Local secrets and credentials.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+*.jks
+credentials.json
+secrets.json
+
+# Orca runtime is transient; the reviewed worker-role profile is shared config.
+.orca/*
+!.orca/orchestration-profile.json

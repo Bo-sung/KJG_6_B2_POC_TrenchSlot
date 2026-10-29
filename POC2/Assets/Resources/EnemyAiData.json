@@ -1,0 +1,12 @@
+{
+  "status": "provisional",
+  "hideSeconds": 1.5,
+  "peekSeconds": 1.2,
+  "coverRetrySeconds": 0.75,
+  "revalidateSeconds": 0.25,
+  "pathRefreshSeconds": 0.5,
+  "stuckSeconds": 3.0,
+  "arrivalDistance": 0.2,
+  "searchRadius": 65.0,
+  "navSampleDistance": 2.0
+}

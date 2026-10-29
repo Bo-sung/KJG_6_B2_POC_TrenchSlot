@@ -1,0 +1,7 @@
+{
+  "enemies": [
+    { "id": "rusher", "name": "러셔", "maxHealth": 50, "moveSpeed": 5.5, "attackDamage": 12, "attackInterval": 1.0, "attackRange": 2, "stopDistance": 1.5, "ranged": false, "reward": 10 },
+    { "id": "rifleman", "name": "소총병", "maxHealth": 60, "moveSpeed": 2.5, "attackDamage": 8, "attackInterval": 1.6, "attackRange": 40, "stopDistance": 25, "ranged": true, "reward": 15, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.05 },
+    { "id": "heavy", "name": "중장", "maxHealth": 200, "moveSpeed": 2.0, "attackDamage": 15, "attackInterval": 2.0, "attackRange": 30, "stopDistance": 15, "ranged": true, "reward": 40, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.08 }
+  ]
+}

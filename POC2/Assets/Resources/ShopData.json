@@ -1,0 +1,11 @@
+{
+  "items": [
+    { "id": "buy_bolt", "type": "weapon", "target": "bolt", "label": "볼트액션 소총", "price": 150 },
+    { "id": "buy_smg", "type": "weapon", "target": "smg", "label": "기관단총", "price": 150 },
+    { "id": "heal", "type": "heal", "target": "", "label": "응급 처치", "price": 30 },
+    { "id": "perk_discount", "type": "perk", "target": "discountLever", "label": "할인 레버", "price": 120 },
+    { "id": "perk_kill", "type": "perk", "target": "killStack", "label": "킬 스택", "price": 100 },
+    { "id": "perk_spindle", "type": "perk", "target": "fastSpindle", "label": "고속 스핀들", "price": 120 },
+    { "id": "perk_ammo", "type": "perk", "target": "ammoSymbol", "label": "탄약 심볼", "price": 100 }
+  ]
+}
