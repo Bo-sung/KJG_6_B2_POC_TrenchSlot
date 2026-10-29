@@ -449,6 +449,14 @@ public static class PocVerification
                 Check(gm.Phase == GameManager.GamePhase.Wave && gm.WaveNumber == 1, "wave 1 starts automatically");
                 Check(waves.AliveCount > 0 || !waves.AllSpawned, "enemies spawn during wave 1");
                 Check(weapon.MagazineSize == 6 && weapon.Ammo == 6, $"player starts with six-round revolver in scene (ammo {weapon.Ammo}/{weapon.MagazineSize})");
+                Check(weapon.AmmoId == "pistol" && weapon.ReserveAmmo == 36,
+                    "starting revolver uses pistol reserve separately from its loaded magazine");
+                foreach (var ammoEntry in TableManager.Instance.Ammo.ammoTypes)
+                {
+                    Check(gm.Ammo.GetReserve(ammoEntry.id) == ammoEntry.startingReserve &&
+                          gm.Ammo.GetMaximum(ammoEntry.id) == ammoEntry.maxReserve,
+                        $"new Game scene initializes {ammoEntry.id} reserve and capacity from AmmoData");
+                }
                 int rusherGuns = 0;
                 int riflemanWrongGun = 0;
                 foreach (var enemy in UnityEngine.Object.FindObjectsByType<Enemy>(FindObjectsSortMode.None))
