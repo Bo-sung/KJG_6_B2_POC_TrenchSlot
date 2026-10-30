@@ -92,6 +92,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     public int ReserveAmmo => inventory != null ? inventory.GetReserve(AmmoId) : 0;
     public WeaponInstance Current => current;
     public Camera AimCamera => aimCamera;
+    public LogCombatCollector CombatLog { get; set; }
     public WeaponSettings Settings => settings;
     public bool IsAkimbo => akimbo;
     public int HandCount => akimbo ? 2 : 1;
@@ -613,6 +614,7 @@ public sealed class PlayerWeapon : MonoBehaviour
             return;
         }
         var handSettings = HandSettings(hand);
+        WeaponInstance firingWeapon = Hand(hand);
         TakeShot(hand, Time.time, handSettings.ammoSaveChance > 0f ? UnityEngine.Random.value : 1f);
         Fired?.Invoke();
         HandFired?.Invoke(hand);
@@ -630,6 +632,8 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 산탄은 같은 그룹 번호를 붙여, 전투 쪽이 발사 1회 저지력 합산 상한과 1회 넉백을 적용하게 한다.
         int pellets = Mathf.Max(1, handSettings.pellets);
         int group = pellets > 1 ? ++pelletGroupCounter : 0;
+        LogShotContext logShot = CombatLog?.StartShot(firingWeapon, firingWeapon?.WeaponId, hand,
+            new LogPosition3 { x = origin.x, y = origin.y, z = origin.z }, pellets);
         var shot = new Projectile.Shot
         {
             team = Projectile.Team.Player,
@@ -642,7 +646,8 @@ public sealed class PlayerWeapon : MonoBehaviour
             knockback = handSettings.knockback,
             pelletGroup = group,
             pelletCount = pellets,
-            pelletStopCap = handSettings.pelletStoppingPowerCap
+            pelletStopCap = handSettings.pelletStoppingPowerCap,
+            logContext = logShot
         };
         for (int i = 0; i < pellets; i++)
         {
@@ -653,12 +658,15 @@ public sealed class PlayerWeapon : MonoBehaviour
             {
                 direction = view;
             }
+            shot.projectileId = logShot?.NewProjectileId();
             Projectile projectile = ProjectileSpawner.Launch(ProjectileSpawner.PLAYER_BULLET, shot, origin, direction, hitLayers, OwnerRoot());
+            logShot?.ProjectileCreated(shot.projectileId, projectile != null);
             if (projectile != null)
             {
                 projectile.Impacted += _impact => OnProjectileImpact(_impact, group);
             }
         }
+        logShot?.FinalizeShot();
     }
 
     // 카메라에서 _view 방향으로 사거리 안 첫 솔리드(자기 몸 제외)에 닿는 점. 없으면 사거리 끝 점이다.

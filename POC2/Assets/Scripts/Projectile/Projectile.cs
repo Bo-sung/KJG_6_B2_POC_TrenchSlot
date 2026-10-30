@@ -32,6 +32,9 @@ public sealed class Projectile : MonoBehaviour
         public int pelletGroup;
         public int pelletCount;
         public float pelletStopCap;
+        public LogShotContext logContext;
+        public string projectileId;
+        public LogAttackSource attackSource;
     }
 
     // 충돌 결과. 피격 대상이 적이고 실제로 피해가 들어갔으면 damagedEnemy가 true다.
@@ -42,6 +45,11 @@ public sealed class Projectile : MonoBehaviour
         public Vector3 normal;
         public bool damagedEnemy;
         public bool killed;
+        public LogShotContext logContext;
+        public string projectileId;
+        public string enemyTypeId;
+        public string targetId;
+        public float actualEnemyDamage;
 
         // 전투 피드백 확장
         public bool isHeadshot;
@@ -157,8 +165,12 @@ public sealed class Projectile : MonoBehaviour
                     {
                         continue;
                     }
+                    float healthBefore = enemy.Health;
+                    string enemyTypeId = enemy.KindId;
+                    string targetId = enemy.GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture);
                     CombatHitResult combatResult = enemy.TakeHit(shot, hit, shotOrigin);
-                    Resolve(hit, true, enemy.IsDead, combatResult);
+                    float actualDamage = Mathf.Max(0f, healthBefore - Mathf.Max(0f, enemy.Health));
+                    Resolve(hit, true, enemy.IsDead, combatResult, targetId, enemyTypeId, actualDamage);
                     return true;
                 }
             }
@@ -173,7 +185,7 @@ public sealed class Projectile : MonoBehaviour
                 {
                     if (player.IsAlive)
                     {
-                        player.ApplyDamage(shot.damage, shotOrigin);
+                        player.ApplyDamage(shot.damage, shotOrigin, shot.attackSource);
                     }
                     Resolve(hit, false, false);
                     return true;
@@ -206,24 +218,41 @@ public sealed class Projectile : MonoBehaviour
         return owner != null && _part.IsChildOf(owner);
     }
 
-    private void Resolve(RaycastHit _hit, bool _damagedEnemy, bool _killed, CombatHitResult _combatResult = default)
+    private void Resolve(RaycastHit _hit, bool _damagedEnemy, bool _killed, CombatHitResult _combatResult = default,
+        string _targetId = null, string _enemyTypeId = null, float _actualEnemyDamage = 0f)
     {
         resolved = true;
         EffectSpawner.Spawn(EffectSpawner.HIT_SPARK, _hit.point, Quaternion.LookRotation(_hit.normal));
-        Impacted?.Invoke(new Impact
+        var impact = new Impact
         {
             team = shot.team,
             point = _hit.point,
             normal = _hit.normal,
             damagedEnemy = _damagedEnemy,
             killed = _killed,
+            logContext = shot.logContext,
+            projectileId = shot.projectileId,
+            targetId = _targetId,
+            enemyTypeId = _enemyTypeId,
+            actualEnemyDamage = _actualEnemyDamage,
             isHeadshot = _combatResult.isHeadshot,
             isHelmetHit = _combatResult.isHelmetHit,
             damageDealt = _combatResult.damageDealt,
             stoppingApplied = _combatResult.stoppingApplied,
             staggered = _combatResult.staggered,
             knockedBack = _combatResult.knockedBack
+        };
+        shot.logContext?.Impact(new LogCombatImpact
+        {
+            projectileId = shot.projectileId,
+            hitEnemy = _damagedEnemy,
+            killed = _killed,
+            targetId = _targetId,
+            enemyTypeId = _enemyTypeId,
+            actualDamage = _actualEnemyDamage,
+            point = new LogPosition3 { x = _hit.point.x, y = _hit.point.y, z = _hit.point.z }
         });
+        Impacted?.Invoke(impact);
         Finish();
     }
 
@@ -231,6 +260,7 @@ public sealed class Projectile : MonoBehaviour
     private void Finish()
     {
         resolved = true;
+        shot.logContext?.ProjectileEnded(shot.projectileId, "resolved_or_expired");
         active.Remove(this);
         Discard(gameObject);
     }
@@ -258,6 +288,7 @@ public sealed class Projectile : MonoBehaviour
             if (projectile != null)
             {
                 projectile.resolved = true;
+                projectile.shot.logContext?.ProjectileEnded(projectile.shot.projectileId, "cancelled");
                 Discard(projectile.gameObject);
             }
         }

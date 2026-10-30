@@ -173,6 +173,7 @@ public sealed partial class GameManager : MonoBehaviour
     private void OnDestroy()
     {
         EndLogging("unknown");
+        DetachCombatLogging();
         ClearAmmoDrops();
         if (playerHealth != null)
         {
@@ -1036,6 +1037,7 @@ public sealed partial class GameManager : MonoBehaviour
             }
         }
         ApplyMoveSpeed();
+        ObserveLogging(SynchronizeCombatEquipment);
     }
 
     private void ApplyMoveSpeed()

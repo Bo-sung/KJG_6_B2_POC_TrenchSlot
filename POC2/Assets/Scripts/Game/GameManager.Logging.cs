@@ -6,6 +6,7 @@ public sealed partial class GameManager
 {
     private LogGameLifecycle telemetry;
     private LogFixedTickCollector logFixedTicks;
+    private LogCombatCollector logCombat;
     private bool loggingInitialized;
     private float? logDeathRadius;
 
@@ -29,6 +30,8 @@ public sealed partial class GameManager
             session = LogUnityAdapter.CreateSession();
             telemetry = new LogGameLifecycle(session);
             logFixedTicks = new LogFixedTickCollector(telemetry);
+            logCombat = new LogCombatCollector(telemetry);
+            telemetry.RegisterCollector(logCombat);
             string fingerprint = null;
             try
             {
@@ -54,6 +57,15 @@ public sealed partial class GameManager
                 session.ReportCollectionFailure(exception);
             }
             telemetry.Start(Application.version, Application.buildGUID, fingerprint, gameObject.scene.path);
+            if (weapon != null)
+            {
+                weapon.CombatLog = logCombat;
+            }
+            if (playerHealth != null)
+            {
+                playerHealth.CombatLog = logCombat;
+            }
+            SynchronizeCombatEquipment();
         }
         catch (Exception exception)
         {
@@ -123,6 +135,44 @@ public sealed partial class GameManager
     private void OnApplicationQuit()
     {
         EndLogging("application_quit");
+    }
+
+    private void SynchronizeCombatEquipment()
+    {
+        if (logCombat == null || weapon == null)
+        {
+            return;
+        }
+        var held = new List<LogHeldWeaponSnapshot>();
+        for (int hand = 0; hand < weapon.HandCount; hand++)
+        {
+            WeaponInstance instance = weapon.Hand(hand);
+            if (instance == null)
+            {
+                continue;
+            }
+            int slot = loadout != null ? loadout.IndexOf(instance) : -1;
+            held.Add(new LogHeldWeaponSnapshot
+            {
+                instanceId = telemetry.Session.GetWeaponId(instance),
+                weaponTypeId = instance.WeaponId,
+                hand = hand == 0 ? "right" : "left",
+                slot = slot >= 0 ? slot : (int?)null
+            });
+        }
+        logCombat.SetEquipped(held);
+    }
+
+    private void DetachCombatLogging()
+    {
+        if (weapon != null && ReferenceEquals(weapon.CombatLog, logCombat))
+        {
+            weapon.CombatLog = null;
+        }
+        if (playerHealth != null && ReferenceEquals(playerHealth.CombatLog, logCombat))
+        {
+            playerHealth.CombatLog = null;
+        }
     }
 
     public void PrepareForTitleReturn()

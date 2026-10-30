@@ -871,7 +871,14 @@ public sealed class Enemy : MonoBehaviour, IDamageable
             return;
         }
         // 근접 러셔는 총이 없어 접촉 거리에서 직접 때린다. 원거리 적은 위에서 발사체만 보낸다.
-        target.ApplyDamage(attackDamage, transform.position);
+        target.ApplyDamage(attackDamage, transform.position, CaptureAttackSource(transform.position));
+    }
+
+    private LogAttackSource CaptureAttackSource(Vector3 _position)
+    {
+        string weaponId = stats != null && !stats.ranged ? "unarmed" : WeaponId;
+        return new LogAttackSource(KindId, weaponId,
+            new LogPosition3 { x = _position.x, y = _position.y, z = _position.z });
     }
 
     // 원거리 적의 발사. 피해는 여기서 주지 않는다. 탄이 플레이어나 지형에 닿을 때 Projectile이 준다.
@@ -904,7 +911,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
             speed = projectileSpeed,
             maxDistance = attackRange,
             lifetime = projectileLifetime,
-            radius = projectileRadius
+            radius = projectileRadius,
+            attackSource = CaptureAttackSource(origin)
         };
         ProjectileSpawner.Launch(ProjectileSpawner.ENEMY_BULLET, shot, origin, direction, ENEMY_SHOT_MASK, transform);
     }

@@ -254,7 +254,7 @@ public sealed class LogGameLifecycle
                     session.ReportCollectionFailure(exception);
                 }
             }
-            session.TryRecord("wave_summary", new
+            var summary = LogJson.CopyPayload(new
             {
                 summaryId,
                 revision = 0,
@@ -275,6 +275,22 @@ public sealed class LogGameLifecycle
                 healthRestored = _healthRestored,
                 summaries
             });
+            session.TryRecord("wave_summary", summary);
+            foreach (var entry in collectors)
+            {
+                if (!(entry.Value is ILogWaveSummaryReceiver receiver))
+                {
+                    continue;
+                }
+                try
+                {
+                    receiver.SummaryClosed(boundary, summary);
+                }
+                catch (Exception exception)
+                {
+                    session.ReportCollectionFailure(exception);
+                }
+            }
         }
         finally
         {
