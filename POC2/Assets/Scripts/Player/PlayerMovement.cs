@@ -25,6 +25,8 @@ public sealed class PlayerMovement : MonoBehaviour
     private GameConfigData feedbackConfig;
 
     public bool IsCrouched { get; private set; }
+    public bool IsControlEnabled => isActiveAndEnabled && controller != null && controller.enabled &&
+        InputGate.PlayerEnabled && (health == null || health.IsAlive);
     // 이동속도 배율(이동속도 스탯 × 든 무기 무게). GameManager가 정한다.
     public float SpeedMultiplier { get; set; } = 1f;
     public float CurrentMoveSpeed => moveSpeed * Mathf.Max(0f, SpeedMultiplier) * (IsCrouched ? GameConfigInfo.CrouchSpeedRatio(feedbackConfig) : 1f);

@@ -91,6 +91,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     public string AmmoId { get; private set; }
     public int ReserveAmmo => inventory != null ? inventory.GetReserve(AmmoId) : 0;
     public WeaponInstance Current => current;
+    public Camera AimCamera => aimCamera;
     public WeaponSettings Settings => settings;
     public bool IsAkimbo => akimbo;
     public int HandCount => akimbo ? 2 : 1;

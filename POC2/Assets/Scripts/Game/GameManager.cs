@@ -6,7 +6,7 @@ using UnityEngine;
 // 한 판의 흐름을 관리한다. 웨이브(슬롯 가능) → 정비(상점) → 다음 웨이브를 반복하며, 플레이어 사망 시 종료한다.
 // 소지금·퍽·무기 슬롯·파츠·스탯은 모델로 들고, 화면은 Presenter가 이벤트를 받아 갱신한다.
 // 상점 구매 판정(TryBuy*/TryAttach*)은 여기서 하며 실패 사유를 문자열로 돌려준다(빈 문자열이면 성공).
-public sealed class GameManager : MonoBehaviour
+public sealed partial class GameManager : MonoBehaviour
 {
     public enum GamePhase
     {
@@ -159,6 +159,7 @@ public sealed class GameManager : MonoBehaviour
 
     private void Start()
     {
+        InitializeLogging();
         StartCoroutine(StartFirstWaveNextFrame());
     }
 
@@ -171,6 +172,7 @@ public sealed class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        EndLogging("unknown");
         ClearAmmoDrops();
         if (playerHealth != null)
         {
@@ -233,6 +235,7 @@ public sealed class GameManager : MonoBehaviour
         killsThisWave = 0;
         SetPhase(GamePhase.Wave);
         waves.Begin(currentWave, TableManager.Instance.Enemy, TableManager.Instance.EnemyWeapon, playerHealth);
+        ObserveLogging(() => telemetry.BeginWave(CaptureLogPlan(), CaptureLogPlayer()));
         WaveStarted?.Invoke(currentWave);
         WaveTimeChanged?.Invoke(waveTimeLeft, currentWave.durationSeconds);
         KillsChanged?.Invoke(killsThisWave);
@@ -249,6 +252,8 @@ public sealed class GameManager : MonoBehaviour
         }
         // Heal/Wallet 이벤트를 통한 재진입보다 먼저 기록한다(웨이브당 한 번).
         lastCompletedWave = currentWave.wave;
+        LogEnemySnapshot enemiesBeforeCleanup = null;
+        ObserveLogging(() => enemiesBeforeCleanup = CaptureLogEnemies());
         waves.Stop();
         var config = TableManager.Instance.GameConfig;
         float healthBefore = playerHealth.CurrentHealth;
@@ -258,6 +263,7 @@ public sealed class GameManager : MonoBehaviour
         wallet.Add(WaveBonusPaid);
         // 진열된 슬롯 업그레이드를 전부 샀다면 새로 추첨한다. 일부만 샀으면 유지한다.
         slotOffers.OnWaveEnded();
+        ObserveLogging(() => telemetry.CompleteWave(CaptureLogPlayer(), enemiesBeforeCleanup, WaveBonusPaid, WaveHealthRestored));
         WaveEnded?.Invoke(currentWave.wave);
         intermissionLeft = GameConfigInfo.IntermissionSeconds(config);
         SetPhase(GamePhase.Shop);
@@ -267,6 +273,7 @@ public sealed class GameManager : MonoBehaviour
     private void SetPhase(GamePhase _next)
     {
         phase = _next;
+        ObserveLogging(() => telemetry.SetPhase(LogPhase(_next)));
         if (_next != GamePhase.Wave)
         {
             ClearAmmoDrops();
@@ -284,6 +291,7 @@ public sealed class GameManager : MonoBehaviour
         wallet.Add(_enemy.Reward);
         killsThisWave++;
         totalKills++;
+        ObserveLogging(() => telemetry.EnemyKilled());
         KillsChanged?.Invoke(killsThisWave);
     }
 
@@ -353,6 +361,7 @@ public sealed class GameManager : MonoBehaviour
         {
             return;
         }
+        ObserveLogging(() => telemetry.EnemiesCleared());
         EnemiesCleared?.Invoke(waveTimeLeft);
     }
 
@@ -362,6 +371,7 @@ public sealed class GameManager : MonoBehaviour
         {
             return;
         }
+        EndLogging("death", true);
         waves.Stop();
         ClearGroundWeapons();
         SetPhase(GamePhase.GameOver);

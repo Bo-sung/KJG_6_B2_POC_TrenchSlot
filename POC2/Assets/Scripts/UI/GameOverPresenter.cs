@@ -37,6 +37,7 @@ public sealed class GameOverPresenter : MonoBehaviour
     private void OnTitleClicked()
     {
         SoundPlayer.Play(SfxType.Click);
+        gameManager.PrepareForTitleReturn();
         SceneManager.LoadScene(SceneNames.TITLE);
     }
 }

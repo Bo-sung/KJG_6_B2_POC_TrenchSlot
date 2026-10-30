@@ -27,6 +27,7 @@ public sealed class TableManager
     public PerkData Perk { get; private set; }
     public GameConfigData GameConfig { get; private set; }
     public WeaponAimData WeaponAim { get; private set; }
+    public LogData Log { get; private set; }
 
     private TableManager()
     {
@@ -69,6 +70,12 @@ public sealed class TableManager
         GameConfig = Load<GameConfigData>(nameof(GameConfigData));
         GameConfigInfo.Validate(GameConfig);
         WeaponAim = Load<WeaponAimData>(nameof(WeaponAimData));
+        Log = Load<LogData>(nameof(LogData));
+        if (!LogInfo.TryValidate(Log, out string logError))
+        {
+            Log.enabled = false;
+            Debug.LogError(logError);
+        }
     }
 
     /// <summary>반복 호출해도 테이블을 다시 읽지 않는다.</summary>
