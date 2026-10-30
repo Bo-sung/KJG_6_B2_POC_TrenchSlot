@@ -10,7 +10,8 @@ public enum LogIdKind
     Projectile,
     Spin,
     PurchaseAttempt,
-    AmmoTransaction
+    AmmoTransaction,
+    OfferSet
 }
 
 public sealed class LogRecord

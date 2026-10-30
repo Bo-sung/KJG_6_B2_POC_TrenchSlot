@@ -4,7 +4,6 @@ public sealed class LogGameplayEvents
 {
     private const string CATEGORY_WAVE = "wave";
     private const string CATEGORY_SLOT = "slot";
-    private const string CATEGORY_SHOP = "shop";
     private const string CATEGORY_WEAPON = "weapon";
     private readonly LogGameLifecycle lifecycle;
 
@@ -52,26 +51,6 @@ public sealed class LogGameplayEvents
     }
 
 
-    public void ShopPurchase(string _itemType, string _itemId, string _failure, int _balanceBefore, int _balanceAfter)
-    {
-        if (!lifecycle.IsActive || !lifecycle.Session.IsRecording)
-        {
-            return;
-        }
-        bool success = string.IsNullOrEmpty(_failure);
-        int price = Math.Max(0, _balanceBefore - _balanceAfter);
-        Write(CATEGORY_SHOP, success ? "PurchaseSucceeded" : "PurchaseFailed", new ShopPurchaseEvent
-        {
-            itemType = _itemType ?? "",
-            itemId = _itemId ?? "",
-            success = success,
-            reason = _failure ?? "",
-            spentAmount = price,
-            balanceBefore = _balanceBefore,
-            balance = _balanceAfter
-        });
-    }
-
     public void WeaponDropped(string _weaponId, int _magazine, string _reason)
     {
         WriteWeapon("WeaponDropped", _weaponId, -1, "", _magazine, _reason);
@@ -113,8 +92,6 @@ public sealed class LogGameplayEvents
                 case "IntermissionStarted": name = "intermission_started"; break;
                 case "SpinRequested": name = "spin_requested"; break;
                 case "SpinRejected": name = "spin_rejected"; break;
-                case "PurchaseSucceeded": name = "purchase_succeeded"; break;
-                case "PurchaseFailed": name = "purchase_failed"; break;
                 case "WeaponDropped": name = "dropped"; break;
                 case "WeaponBought": name = "bought"; break;
                 case "WeaponPickedUp": name = "picked_up"; break;

@@ -471,15 +471,12 @@ public sealed partial class GameManager : MonoBehaviour
     // 무기 구매. 빈 슬롯이 있으면 그 슬롯에 넣고 현재 무기를 유지한다. 슬롯이 가득 차면 _slot의 무기를 바닥에 놓고 교체하며,
     // 사용 중 슬롯을 교체하면 새 무기를 즉시 든다. 새 무기는 탄창이 가득 찬 채 지급되며 공유 예비탄에서 빼지 않는다.
     // 돈을 쓰기 전에 자리·프리팹을 모두 확인하므로, 실패하면 소지금과 슬롯이 그대로 남는다.
-    public string TryBuyWeapon(string _weaponId, int _slot)
+    public string TryBuyWeapon(string _weaponId, int _slot, LogShopOfferReference _logOffer = null)
     {
-        int balanceBefore = wallet.Balance;
-        string failure = BuyWeapon(_weaponId, _slot);
-        gameplayLog?.ShopPurchase("Weapon", _weaponId, failure, balanceBefore, wallet.Balance);
-        return failure;
+        return RunLoggedPurchase("Weapon", _weaponId, _slot, null, _logOffer, _cause => BuyWeapon(_weaponId, _slot, _cause));
     }
 
-    private string BuyWeapon(string _weaponId, int _slot)
+    private string BuyWeapon(string _weaponId, int _slot, string _causeId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -541,7 +538,7 @@ public sealed partial class GameManager : MonoBehaviour
         }
         WeaponInstance bought = NewWeapon(_weaponId);
         loadout.Put(slot, bought);
-        ObserveLogging(() => ObserveNewLogWeapon(bought, "new_weapon"));
+        ObserveLogging(() => ObserveNewLogWeapon(bought, "new_weapon", _causeId));
         gameplayLog?.WeaponAcquired("WeaponBought", _weaponId, slot, outgoing != null ? outgoing.WeaponId : "", bought.Magazine);
         if (replacingHeld)
         {
@@ -553,15 +550,12 @@ public sealed partial class GameManager : MonoBehaviour
     // 파츠 구매. 같은 파츠를 여러 개 살 수 있으며 살 때마다 새 개체가 생긴다.
     // 같은 종류 휴대 무기 중 그 칸이 빈 무기(사용 중 → 아킴보 왼손 → 나머지 순)에 바로 붙이고,
     // 빈 칸이 없으면 이 파츠가 없는 무기의 칸을 바꿔 끼운다(원래 파츠는 보관). 붙일 곳이 없거나 장전탄이 넘치면 보관한다.
-    public string TryBuyPart(string _partId)
+    public string TryBuyPart(string _partId, LogShopOfferReference _logOffer = null)
     {
-        int balanceBefore = wallet.Balance;
-        string failure = BuyPart(_partId);
-        gameplayLog?.ShopPurchase("Part", _partId, failure, balanceBefore, wallet.Balance);
-        return failure;
+        return RunLoggedPurchase("Part", _partId, null, null, _logOffer, _cause => BuyPart(_partId, _cause));
     }
 
-    private string BuyPart(string _partId)
+    private string BuyPart(string _partId, string _causeId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -586,7 +580,7 @@ public sealed partial class GameManager : MonoBehaviour
         var target = AutoAttachTarget(part);
         if (bought != null && target != null)
         {
-            AttachAndRefresh(bought, target);
+            AttachAndRefresh(bought, target, _causeId);
         }
         return "";
     }
@@ -802,15 +796,12 @@ public sealed partial class GameManager : MonoBehaviour
         return closed != "" ? closed : "휴대 무기에 장착된 파츠가 아닙니다.";
     }
 
-    public string TryBuyStat(string _statId)
+    public string TryBuyStat(string _statId, LogShopOfferReference _logOffer = null)
     {
-        int balanceBefore = wallet.Balance;
-        string failure = BuyStat(_statId);
-        gameplayLog?.ShopPurchase("Stat", _statId, failure, balanceBefore, wallet.Balance);
-        return failure;
+        return RunLoggedPurchase("Stat", _statId, null, null, _logOffer, _cause => BuyStat(_statId, _cause));
     }
 
-    private string BuyStat(string _statId)
+    private string BuyStat(string _statId, string _causeId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -828,19 +819,16 @@ public sealed partial class GameManager : MonoBehaviour
             return "소지금이 부족합니다.";
         }
         stats.Buy(_statId);
-        ApplyStats(_statId);
+        ApplyStats(_statId, _causeId);
         return "";
     }
 
-    public string TryBuyAmmo(string _ammoId)
+    public string TryBuyAmmo(string _ammoId, LogShopOfferReference _logOffer = null)
     {
-        int balanceBefore = wallet.Balance;
-        string failure = BuyAmmo(_ammoId);
-        gameplayLog?.ShopPurchase("Ammo", _ammoId, failure, balanceBefore, wallet.Balance);
-        return failure;
+        return RunLoggedPurchase("Ammo", _ammoId, null, null, _logOffer, _cause => BuyAmmo(_ammoId, _cause));
     }
 
-    private string BuyAmmo(string _ammoId)
+    private string BuyAmmo(string _ammoId, string _causeId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -851,7 +839,7 @@ public sealed partial class GameManager : MonoBehaviour
         {
             return "아직 판매하지 않는 탄약입니다.";
         }
-        return ammoShop.TryBuy(_ammoId);
+        return ammoShop.TryBuy(_ammoId, _causeId);
     }
 
     // 회전 결과의 현물 계획. 시대·해금은 회전이 시작된 웨이브(_spinWave) 기준이다. 실제 지급은 SlotRewardInfo.Apply가 한다.
@@ -900,13 +888,9 @@ public sealed partial class GameManager : MonoBehaviour
     }
 
     // 슬롯 업그레이드 진열 칸 구매. 산 칸은 다음 갱신까지 빈 칸으로 남는다.
-    public string TryBuySlotUpgrade(int _offerIndex)
+    public string TryBuySlotUpgrade(int _offerIndex, LogShopOfferReference _logOffer = null)
     {
-        int balanceBefore = wallet.Balance;
-        string perkId = slotOffers.Get(_offerIndex);
-        string failure = BuySlotUpgrade(_offerIndex);
-        gameplayLog?.ShopPurchase("SlotUpgrade", perkId, failure, balanceBefore, wallet.Balance);
-        return failure;
+        return RunLoggedPurchase("SlotUpgrade", slotOffers.Get(_offerIndex), null, _offerIndex, _logOffer, _cause => BuySlotUpgrade(_offerIndex));
     }
 
     private string BuySlotUpgrade(int _offerIndex)
@@ -1054,19 +1038,19 @@ public sealed partial class GameManager : MonoBehaviour
         return WeaponInfo.Resolve(entry, parts.PartsOf(_weapon), stats.ReloadMultiplier);
     }
 
-    private void AttachAndRefresh(PartInstance _part, WeaponInstance _target)
+    private void AttachAndRefresh(PartInstance _part, WeaponInstance _target, string _causeId = null)
     {
         var previous = _part.AttachedTo;
         parts.Attach(_part, _target);
         if (previous != null && previous != _target)
         {
-            RefreshWeaponStats(previous);
+            RefreshWeaponStats(previous, _causeId);
         }
-        RefreshWeaponStats(_target);
+        RefreshWeaponStats(_target, _causeId);
     }
 
     // 파츠 변화 후 장전탄을 새 탄창 크기에 맞춘다. 넘치는 장전탄은 공유 예비탄으로 돌려준다.
-    private void RefreshWeaponStats(WeaponInstance _weapon)
+    private void RefreshWeaponStats(WeaponInstance _weapon, string _causeId = null)
     {
         if (_weapon == null)
         {
@@ -1077,7 +1061,7 @@ public sealed partial class GameManager : MonoBehaviour
         {
             int removed = _weapon.Magazine - settings.magazineSize;
             int returned = 0;
-            string causeId = logAmmo?.NewCauseId();
+            string causeId = _causeId ?? logAmmo?.NewCauseId();
             var entry = WeaponInfo.Find(TableManager.Instance.Weapon, _weapon.WeaponId);
             if (entry != null)
             {
@@ -1145,7 +1129,7 @@ public sealed partial class GameManager : MonoBehaviour
         movement.SpeedMultiplier = stats.MoveSpeedMultiplier * WeaponInfo.MoveSpeedMultiplier(entry);
     }
 
-    private void ApplyStats(string _statId)
+    private void ApplyStats(string _statId, string _causeId = null)
     {
         switch (_statId)
         {
@@ -1176,7 +1160,7 @@ public sealed partial class GameManager : MonoBehaviour
                 {
                     if (entry != null)
                     {
-                        ammo.SetMaximum(entry.id, entry.maxReserve + stats.AmmoCapacityBonus, false);
+                        ammo.SetMaximum(entry.id, entry.maxReserve + stats.AmmoCapacityBonus, false, _causeId);
                     }
                 }
                 break;

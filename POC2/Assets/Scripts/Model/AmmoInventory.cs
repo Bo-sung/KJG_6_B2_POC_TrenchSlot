@@ -84,7 +84,7 @@ public sealed class AmmoInventory
     }
 
     // 초과분 폐기 여부는 호출자가 명시한다. false일 때 현재량보다 낮추는 요청은 상태 변경 없이 거절한다.
-    public bool SetMaximum(string _id, int _maximum, bool _discardExcess)
+    public bool SetMaximum(string _id, int _maximum, bool _discardExcess, string _causeId = null)
     {
         if (_maximum < 0 || _id == null || !stocks.TryGetValue(_id, out var stock) ||
             (!_discardExcess && stock.reserve > _maximum))
@@ -99,7 +99,7 @@ public sealed class AmmoInventory
         int previousReserve = stock.reserve;
         stock.maximum = _maximum;
         stock.reserve = Math.Min(stock.reserve, _maximum);
-        AmmoLog?.Change(new LogAmmoChange { source = "maximum_changed", ammoTypeId = _id,
+        AmmoLog?.Change(new LogAmmoChange { source = "maximum_changed", ammoTypeId = _id, causeId = _causeId,
             reserveDelta = stock.reserve - previousReserve, discarded = previousReserve - stock.reserve,
             reserveMaximumBefore = previousMaximum, reserveMaximumAfter = stock.maximum });
         Changed?.Invoke(_id, stock.reserve, stock.maximum);

@@ -17,20 +17,6 @@ public sealed class SlotSpinEvent
 }
 
 [Serializable]
-public sealed class ShopPurchaseEvent
-{
-    // Weapon · Part · Stat · Ammo · SlotUpgrade
-    public string itemType;
-    public string itemId;
-    public bool success;
-    // 실패 사유(성공이면 빈 문자열).
-    public string reason;
-    public int spentAmount;
-    public int balanceBefore;
-    public int balance;
-}
-
-[Serializable]
 public sealed class WeaponChangeEvent
 {
     public string weaponId;

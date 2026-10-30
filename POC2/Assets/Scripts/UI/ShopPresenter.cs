@@ -5,7 +5,7 @@ using UnityEngine;
 // 정비 상점 규칙(Presenter). 정비 시간에만 열리며, 열리는 동안 마우스 커서를 풀어 둔다.
 // 화면 줄과 테이블 항목의 대응·문구는 여기서 정하고, 구매·장착·아킴보 판정은 GameManager.Try*가 한다.
 // 파츠는 같은 종류를 여러 개 가질 수 있으므로 장착·분리는 파츠 개체(PartInstance) 단위로 넘긴다.
-public sealed class ShopPresenter : MonoBehaviour
+public sealed partial class ShopPresenter : MonoBehaviour
 {
     [SerializeField] private ShopView view;
     [SerializeField] private GameManager gameManager;
@@ -129,6 +129,10 @@ public sealed class ShopPresenter : MonoBehaviour
     {
         bool shopOpen = _phase == GameManager.GamePhase.Shop;
         view.SetVisible(shopOpen);
+        if (!shopOpen)
+        {
+            gameManager.ObserveShopExposure(false, null, null, null);
+        }
         InputGate.PlayerEnabled = !shopOpen && _phase != GameManager.GamePhase.GameOver;
         // 게임 오버 때 커서는 GameOverPresenter가 푼다. 두 Presenter가 같은 전이에서 커서를 다투지 않도록 여기서는 건드리지 않는다.
         if (_phase != GameManager.GamePhase.GameOver)
@@ -171,7 +175,7 @@ public sealed class ShopPresenter : MonoBehaviour
 
     private void OnWeaponBuyClicked(int _slot)
     {
-        Report(gameManager.TryBuyWeapon(selectedWeaponId, _slot), $"{WeaponInfo.DisplayName(weapons, selectedWeaponId)} 구매 완료");
+        Report(gameManager.TryBuyWeapon(selectedWeaponId, _slot, LogOffer("Weapon", selectedWeaponId, "weapon_buy", _slot)), $"{WeaponInfo.DisplayName(weapons, selectedWeaponId)} 구매 완료");
     }
 
     private void OnPartSelected(int _index)
@@ -191,7 +195,7 @@ public sealed class ShopPresenter : MonoBehaviour
             return;
         }
         // 구매한 개체는 같은 종류 휴대 무기에 바로 붙거나 보관함으로 간다(GameManager가 정한다). 결과 위치를 알려 준다.
-        string failure = gameManager.TryBuyPart(part.id);
+        string failure = gameManager.TryBuyPart(part.id, LogOffer("Part", part.id, "part_buy"));
         var all = gameManager.Parts.Instances;
         var bought = failure == "" && all.Count > 0 ? all[all.Count - 1] : null;
         Report(failure, bought != null ? $"{part.name} #{bought.Uid} 구매 · {PartPlace(bought)}" : $"{part.name} 구매");
@@ -238,7 +242,7 @@ public sealed class ShopPresenter : MonoBehaviour
     {
         if (_index >= 0 && _index < shop.stats.Length && shop.stats[_index] != null)
         {
-            Report(gameManager.TryBuyStat(shop.stats[_index].id), $"{shop.stats[_index].name} 강화");
+            Report(gameManager.TryBuyStat(shop.stats[_index].id, LogOffer("Stat", shop.stats[_index].id, "stat")), $"{shop.stats[_index].name} 강화");
         }
     }
 
@@ -247,13 +251,13 @@ public sealed class ShopPresenter : MonoBehaviour
     {
         if (_index >= 0 && _index < shop.ammoPacks.Length && shop.ammoPacks[_index] != null)
         {
-            Report(gameManager.TryBuyAmmo(shop.ammoPacks[_index].ammoId), "탄약 팩 구매");
+            Report(gameManager.TryBuyAmmo(shop.ammoPacks[_index].ammoId, LogOffer("Ammo", shop.ammoPacks[_index].ammoId, "ammo")), "탄약 팩 구매");
         }
     }
 
     private void OnUpgradeClicked(int _index)
     {
-        Report(gameManager.TryBuySlotUpgrade(_index), "슬롯 업그레이드 구매");
+        Report(gameManager.TryBuySlotUpgrade(_index, LogOffer("SlotUpgrade", gameManager.SlotOffers.Get(_index), "upgrade")), "슬롯 업그레이드 구매");
     }
 
     private void OnNextWaveClicked()

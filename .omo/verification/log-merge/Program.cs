@@ -25,6 +25,7 @@ internal static class Program
         var events = new LogGameplayEvents(life);
         var combat = new LogCombatCollector(life);
         var slots = new LogSlotCollector(life);
+        var shop = new LogShopCollector(life);
         var ammo = new LogAmmoCollector(life, () => null);
         ammo.Observed += slots.ObserveAmmo;
         life.RegisterCollector(combat);
@@ -48,8 +49,12 @@ internal static class Program
         slots.Resolve(spin, new LogSlotState { player = new LogPlayerSnapshot { money = 90 } },
             new LogSlotState { player = new LogPlayerSnapshot { money = 113 } },
             new LogSlotOutcome { multiplier = 2, isNearMiss = true }, 1.5, 1.5, 20, new[] { "part" });
-        events.ShopPurchase("Ammo", "rifle", "", 113, 103);
-        events.ShopPurchase("Weapon", "pistol", "InsufficientFunds", 103, 103);
+        var purchase = shop.Begin(new LogShopProduct { itemType = "Ammo", itemId = "rifle", price = 10 },
+            new LogShopSnapshot { player = new LogPlayerSnapshot { money = 113 } }, null);
+        shop.Complete(purchase, true, "", null, new LogShopSnapshot { player = new LogPlayerSnapshot { money = 103 } });
+        var rejected = shop.Begin(new LogShopProduct { itemType = "Weapon", itemId = "pistol", price = 200 },
+            new LogShopSnapshot { player = new LogPlayerSnapshot { money = 103 } }, null);
+        shop.Complete(rejected, true, "InsufficientFunds", "insufficient_funds", new LogShopSnapshot { player = new LogPlayerSnapshot { money = 103 } });
         events.WeaponDropped("pistol", 5, "PickupSwap");
         events.WeaponAcquired("WeaponPickedUp", "rifle", 1, "pistol", 7);
         var shot = combat.StartShot(new object(), "rifle", 0, null, 1, 7, 9, true, true);
@@ -82,8 +87,8 @@ internal static class Program
         Check((float)row("slot_spin_healed")["payload"]["actualHealthRestored"] == 3, "Actual heal preserved");
         Check((string)row("slot_spin_resolved")["payload"]["plannedPartIds"][0] == "part", "Part reward plan preserved");
         Check((int)row("slot_spin_resolved")["payload"]["ammoGranted"][0]["acquired"] == 5, "Actual ammo reward preserved");
-        Check((int)row("shop_purchase_succeeded")["payload"]["spentAmount"] == 10, "Actual spending preserved");
-        Check((int)row("shop_purchase_failed")["payload"]["spentAmount"] == 0, "Failed purchase not represented as quoted price");
+        Check((int)rows.Single(_r => (string)_r["eventType"] == "shop_purchase_result" && (bool)_r["payload"]["success"])["payload"]["actualSpent"] == 10, "Actual spending preserved");
+        Check((int)rows.Single(_r => (string)_r["eventType"] == "shop_purchase_result" && !(bool)_r["payload"]["success"])["payload"]["actualSpent"] == 0, "Failed purchase not represented as quoted price");
         Check((bool)row("player_shot")["payload"]["aiming"] && (bool)row("player_shot")["payload"]["akimbo"], "Shot posture preserved");
         Check((int)row("player_shot")["payload"]["magazineAmmo"] == 7, "Shot ammo snapshot preserved");
         Check((bool)row("projectile_impact")["payload"]["impact"]["headshot"] &&
@@ -96,7 +101,7 @@ internal static class Program
         var disabled = new LogSession(settings, _id => throw new Exception("disabled store"));
         var disabledLife = new LogGameLifecycle(disabled);
         disabledLife.Start("test", null, null, null);
-        new LogGameplayEvents(disabledLife).ShopPurchase("Ammo", "x", "", 10, 0);
+        new LogShopCollector(disabledLife).Begin(new LogShopProduct { itemType = "Ammo", itemId = "x" }, null, null);
         Check(disabled.Sequence == 0, "Canonical setting disables gameplay events");
         foreach (string path in Directory.GetFiles("POC2/Assets", "*.cs", SearchOption.AllDirectories))
         {

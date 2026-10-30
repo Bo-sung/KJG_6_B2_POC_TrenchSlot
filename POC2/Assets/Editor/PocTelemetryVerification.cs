@@ -79,6 +79,40 @@ public static class PocTelemetryVerification
                     "Incomplete spin contains invented reward");
             }
         }
+        var offers = rows.Where(_row => (string)_row["eventType"] == "shop_offers_presented").ToArray();
+        foreach (var group in offers.GroupBy(_row => (string)_row["payload"]["offerSetId"]))
+        {
+            Require(group.Select(_row => (int)_row["payload"]["revision"]).SequenceEqual(Enumerable.Range(0, group.Count())),
+                "Shop revisions must start at zero and increase once");
+        }
+        var attempts = rows.Where(_row => (string)_row["eventType"] == "shop_purchase_attempt").ToArray();
+        var purchases = rows.Where(_row => (string)_row["eventType"] == "shop_purchase_result" ||
+            (string)_row["eventType"] == "shop_purchase_incomplete").ToArray();
+        Require(attempts.Select(_row => (string)_row["payload"]["attemptId"]).Distinct().Count() == attempts.Length &&
+            attempts.Length == purchases.Length, "Purchase attempts and terminals must be unique and paired");
+        foreach (JObject attempt in attempts)
+        {
+            string id = (string)attempt["payload"]["attemptId"];
+            Require(!string.IsNullOrEmpty(id), "Missing purchase attempt ID");
+            var results = purchases.Where(_row => (string)_row["payload"]["attemptId"] == id).ToArray();
+            Require(results.Length == 1 && (long)results[0]["sequence"] > (long)attempt["sequence"], "Purchase terminal missing or out of order");
+            JToken reference = attempt["payload"]["offer"];
+            if (reference != null && reference.Type != JTokenType.Null)
+            {
+                Require(offers.Count(_row => (string)_row["payload"]["offerSetId"] == (string)reference["offerSetId"] &&
+                    (int)_row["payload"]["revision"] == (int)reference["revision"] && (long)_row["sequence"] < (long)attempt["sequence"]) == 1,
+                    "Purchase references unknown shop presentation");
+            }
+            if ((string)results[0]["eventType"] == "shop_purchase_result")
+            {
+                foreach (JToken change in results[0]["payload"]["ammoChanges"])
+                {
+                    Require((string)change["causeId"] == id && rows.Count(_row => (string)_row["eventType"] == "ammo_changed" &&
+                        (string)_row["payload"]["transactionId"] == (string)change["transactionId"] &&
+                        JToken.DeepEquals(_row["payload"], change)) == 1, "Purchase ammo change must match its canonical event");
+                }
+            }
+        }
         Debug.Log("[PocTelemetryVerification] PASS: " + rows.Length + " unified records in " + file);
     }
 

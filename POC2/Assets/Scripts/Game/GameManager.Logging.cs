@@ -39,7 +39,9 @@ public sealed partial class GameManager
             logCombat = new LogCombatCollector(telemetry);
             logAmmo = new LogAmmoCollector(telemetry, CaptureLogAmmo);
             logSlots = new LogSlotCollector(telemetry);
+            logShop = new LogShopCollector(telemetry);
             logAmmo.Observed += logSlots.ObserveAmmo;
+            logAmmo.Observed += logShop.ObserveAmmo;
             telemetry.RegisterCollector(logCombat);
             telemetry.RegisterCollector(logAmmo);
             string fingerprint = null;
@@ -187,6 +189,10 @@ public sealed partial class GameManager
 
     private void DetachCombatLogging()
     {
+        if (logAmmo != null && logShop != null)
+        {
+            logAmmo.Observed -= logShop.ObserveAmmo;
+        }
         if (logAmmo != null && logSlots != null)
         {
             logAmmo.Observed -= logSlots.ObserveAmmo;
@@ -345,14 +351,14 @@ public sealed partial class GameManager
         return new LogAmmoSnapshot { reserves = player.reserves, weapons = entries.ToArray() };
     }
 
-    private void ObserveNewLogWeapon(WeaponInstance _weapon, string _source)
+    private void ObserveNewLogWeapon(WeaponInstance _weapon, string _source, string _causeId = null)
     {
         if (_weapon == null)
         {
             return;
         }
         var entry = WeaponInfo.Find(TableManager.Instance.Weapon, _weapon.WeaponId);
-        logAmmo?.Weapon(_source, _weapon, entry?.ammoId, _weapon.Magazine);
+        logAmmo?.Weapon(_source, _weapon, entry?.ammoId, _weapon.Magazine, null, _causeId);
     }
 
     private void ObserveLogWeaponMove(WeaponInstance _weapon, string _source)

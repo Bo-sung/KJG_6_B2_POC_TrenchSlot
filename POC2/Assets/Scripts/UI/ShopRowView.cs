@@ -18,6 +18,8 @@ public sealed class ShopRowView : MonoBehaviour
     public event Action Clicked;
 
     public Button Button => button;
+    public string LogLabel => label != null ? label.text : null;
+    public string LogPrice => price != null ? price.text : null;
 
     private void Awake()
     {

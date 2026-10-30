@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -61,6 +62,107 @@ public sealed class ShopView : MonoBehaviour
     public int UpgradeRowCount => upgradeRows.Length;
 
     private GameObject lastSelected;
+    private readonly Vector3[] logCorners = new Vector3[4];
+    private readonly List<CanvasGroup> logGroups = new List<CanvasGroup>();
+    private readonly List<RectMask2D> logRectMasks = new List<RectMask2D>();
+    private readonly List<Mask> logMasks = new List<Mask>();
+
+    public bool IsLogVisible => panel != null && IsLogRectVisible(panel.transform as RectTransform);
+
+    public LogShopRowState CaptureLogRow(string _placement, int _index)
+    {
+        if (!IsLogVisible)
+        {
+            return null;
+        }
+        if (_placement == "weapon_detail" || _placement == "part_detail")
+        {
+            TMP_Text text = _placement == "weapon_detail" ? weaponDetailText : partDetailText;
+            return text != null && IsLogRectVisible(text.rectTransform)
+                ? new LogShopRowState { label = text.text } : null;
+        }
+        ShopRowView[] rows = null;
+        switch (_placement)
+        {
+            case "weapon_catalog": rows = weaponRows; break;
+            case "weapon_buy": rows = weaponBuyButtons; break;
+            case "part_catalog": rows = partChips; break;
+            case "stat": rows = statRows; break;
+            case "ammo": rows = supplyRows; break;
+            case "upgrade": rows = upgradeRows; break;
+        }
+        ShopRowView row = _placement == "part_buy" ? partBuyButton :
+            rows != null && _index >= 0 && _index < rows.Length ? rows[_index] : null;
+        if (row == null || !IsLogRectVisible(row.transform as RectTransform))
+        {
+            return null;
+        }
+        return new LogShopRowState { label = row.LogLabel, priceText = row.LogPrice,
+            interactable = row.Button != null && row.Button.IsInteractable() };
+    }
+
+    private bool IsLogRectVisible(RectTransform _rect)
+    {
+        if (_rect == null || !_rect.gameObject.activeInHierarchy || _rect.rect.width <= 0f || _rect.rect.height <= 0f)
+        {
+            return false;
+        }
+        _rect.GetComponentsInParent(false, logGroups);
+        foreach (CanvasGroup group in logGroups)
+        {
+            if (group.alpha <= 0f)
+            {
+                return false;
+            }
+        }
+        _rect.GetWorldCorners(logCorners);
+        _rect.GetComponentsInParent(false, logRectMasks);
+        foreach (RectMask2D mask in logRectMasks)
+        {
+            if (mask.isActiveAndEnabled && !LogOverlaps(mask.rectTransform))
+            {
+                return false;
+            }
+        }
+        _rect.GetComponentsInParent(false, logMasks);
+        foreach (Mask mask in logMasks)
+        {
+            if (mask.isActiveAndEnabled && !LogOverlaps(mask.transform as RectTransform))
+            {
+                return false;
+            }
+        }
+        foreach (ScrollRect scroll in scrolls)
+        {
+            if (scroll != null && scroll.content != null && _rect.IsChildOf(scroll.content) &&
+                !LogOverlaps(scroll.viewport != null ? scroll.viewport : scroll.transform as RectTransform))
+            {
+                return false;
+            }
+        }
+        Canvas canvas = _rect.GetComponentInParent<Canvas>();
+        return canvas != null && canvas.isActiveAndEnabled && LogOverlaps(canvas.rootCanvas.transform as RectTransform);
+    }
+
+    private bool LogOverlaps(RectTransform _clip)
+    {
+        if (_clip == null)
+        {
+            return true;
+        }
+        Vector3 first = _clip.InverseTransformPoint(logCorners[0]);
+        float minX = first.x, maxX = first.x, minY = first.y, maxY = first.y;
+        for (int i = 1; i < logCorners.Length; i++)
+        {
+            Vector3 point = _clip.InverseTransformPoint(logCorners[i]);
+            minX = Mathf.Min(minX, point.x);
+            maxX = Mathf.Max(maxX, point.x);
+            minY = Mathf.Min(minY, point.y);
+            maxY = Mathf.Max(maxY, point.y);
+        }
+        return LogShopVisibility.Overlaps(minX, maxX, minY, maxY,
+            _clip.rect.xMin, _clip.rect.xMax, _clip.rect.yMin, _clip.rect.yMax);
+    }
 
     private void Awake()
     {
