@@ -341,7 +341,7 @@ public sealed partial class GameManager : MonoBehaviour
         {
             return 0;
         }
-        int added = ammo.Add(_pickup.AmmoId, _pickup.Amount);
+        int added = ammo.Add(_pickup.AmmoId, _pickup.Amount, "drop");
         if (added <= 0)
         {
             _pickup.ReleaseClaim();
@@ -541,6 +541,7 @@ public sealed partial class GameManager : MonoBehaviour
         }
         WeaponInstance bought = NewWeapon(_weaponId);
         loadout.Put(slot, bought);
+        ObserveLogging(() => ObserveNewLogWeapon(bought, "new_weapon"));
         gameplayLog?.WeaponAcquired("WeaponBought", _weaponId, slot, outgoing != null ? outgoing.WeaponId : "", bought.Magazine);
         if (replacingHeld)
         {
@@ -959,6 +960,14 @@ public sealed partial class GameManager : MonoBehaviour
         {
             return "주울 수 없는 무기입니다.";
         }
+        ObserveLogging(() =>
+        {
+            if (_pickup.Weapon == null)
+            {
+                ObserveNewLogWeapon(picked, "world_weapon");
+            }
+            ObserveLogWeaponMove(picked, "weapon_pickup");
+        });
         if (outgoing != null)
         {
             weapon.CancelReload();
@@ -1066,12 +1075,16 @@ public sealed partial class GameManager : MonoBehaviour
         var settings = ResolveSettings(_weapon);
         if (_weapon.Magazine > settings.magazineSize)
         {
+            int removed = _weapon.Magazine - settings.magazineSize;
+            int returned = 0;
+            string causeId = logAmmo?.NewCauseId();
             var entry = WeaponInfo.Find(TableManager.Instance.Weapon, _weapon.WeaponId);
             if (entry != null)
             {
-                ammo.Add(entry.ammoId, _weapon.Magazine - settings.magazineSize);
+                returned = ammo.Add(entry.ammoId, removed, "capacity_return", causeId);
             }
             _weapon.Magazine = settings.magazineSize;
+            logAmmo?.Shrink(_weapon, entry?.ammoId, removed, returned, causeId);
         }
         if (weapon != null)
         {
@@ -1186,6 +1199,7 @@ public sealed partial class GameManager : MonoBehaviour
     {
         WeaponPickup drop = Instantiate(PickupPrefabFor(_weapon.WeaponId), _position, Quaternion.identity, GroundRoot());
         drop.Initialize(_weapon, WeaponInfo.DisplayName(TableManager.Instance.Weapon, _weapon.WeaponId));
+        ObserveLogging(() => ObserveLogWeaponMove(_weapon, "weapon_drop"));
         // 같은 프레임의 다음 자리 판정이 방금 놓은 무기를 보도록 물리 상태를 맞춘다.
         Physics.SyncTransforms();
     }

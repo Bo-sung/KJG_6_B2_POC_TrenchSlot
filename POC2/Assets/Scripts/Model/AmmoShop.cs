@@ -13,7 +13,7 @@ public sealed class AmmoShop
         wallet = _wallet;
     }
 
-    public string TryBuy(string _ammoId)
+    public string TryBuy(string _ammoId, string _causeId = null)
     {
         if (buying)
         {
@@ -40,7 +40,7 @@ public sealed class AmmoShop
             {
                 return "소지금이 부족합니다.";
             }
-            int added = ammo.Add(_ammoId, ammo.GetMaximum(_ammoId) - ammo.GetReserve(_ammoId));
+            int added = ammo.Add(_ammoId, ammo.GetMaximum(_ammoId) - ammo.GetReserve(_ammoId), "shop_pack", _causeId);
             if (added <= 0)
             {
                 wallet.Add(price);

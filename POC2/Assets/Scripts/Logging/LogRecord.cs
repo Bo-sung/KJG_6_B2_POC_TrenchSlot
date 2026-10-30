@@ -9,7 +9,8 @@ public enum LogIdKind
     Shot,
     Projectile,
     Spin,
-    PurchaseAttempt
+    PurchaseAttempt,
+    AmmoTransaction
 }
 
 public sealed class LogRecord

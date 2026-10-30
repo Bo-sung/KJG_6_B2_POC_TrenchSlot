@@ -8,6 +8,7 @@ public sealed partial class GameManager
     private LogGameplayEvents gameplayLog;
     private LogFixedTickCollector logFixedTicks;
     private LogCombatCollector logCombat;
+    private LogAmmoCollector logAmmo;
     private bool loggingInitialized;
     private float? logDeathRadius;
 
@@ -34,7 +35,9 @@ public sealed partial class GameManager
             gameplayLog = new LogGameplayEvents(telemetry);
             logFixedTicks = new LogFixedTickCollector(telemetry);
             logCombat = new LogCombatCollector(telemetry);
+            logAmmo = new LogAmmoCollector(telemetry, CaptureLogAmmo);
             telemetry.RegisterCollector(logCombat);
+            telemetry.RegisterCollector(logAmmo);
             string fingerprint = null;
             try
             {
@@ -63,10 +66,22 @@ public sealed partial class GameManager
             if (weapon != null)
             {
                 weapon.CombatLog = logCombat;
+                weapon.AmmoLog = logAmmo;
             }
             if (playerHealth != null)
             {
                 playerHealth.CombatLog = logCombat;
+            }
+            if (ammo != null)
+            {
+                ammo.AmmoLog = logAmmo;
+            }
+            if (loadout != null)
+            {
+                for (int i = 0; i < loadout.SlotCount; i++)
+                {
+                    ObserveNewLogWeapon(loadout.Get(i), "initial_weapon");
+                }
             }
             SynchronizeCombatEquipment();
         }
@@ -168,6 +183,14 @@ public sealed partial class GameManager
 
     private void DetachCombatLogging()
     {
+        if (ammo != null && ReferenceEquals(ammo.AmmoLog, logAmmo))
+        {
+            ammo.AmmoLog = null;
+        }
+        if (weapon != null && ReferenceEquals(weapon.AmmoLog, logAmmo))
+        {
+            weapon.AmmoLog = null;
+        }
         if (weapon != null && ReferenceEquals(weapon.CombatLog, logCombat))
         {
             weapon.CombatLog = null;
@@ -269,6 +292,55 @@ public sealed partial class GameManager
             snapshot.reserves = reserves.ToArray();
         }
         return snapshot;
+    }
+
+    private LogAmmoSnapshot CaptureLogAmmo()
+    {
+        LogPlayerSnapshot player = CaptureLogPlayer();
+        var entries = new List<LogAmmoWeaponSnapshot>();
+        if (player.weapons != null)
+        {
+            foreach (LogWeaponSnapshot held in player.weapons)
+            {
+                entries.Add(new LogAmmoWeaponSnapshot { instanceId = held.instanceId, weaponTypeId = held.weaponTypeId,
+                    ammoTypeId = held.ammoTypeId, location = "carried", hand = held.hand, slot = held.slot, loadedAmmo = held.loadedAmmo });
+            }
+        }
+        Transform root = GroundRoot();
+        for (int i = 0; i < root.childCount; i++)
+        {
+            WeaponPickup pickup = root.GetChild(i).GetComponent<WeaponPickup>();
+            if (pickup == null || pickup.IsConsumed)
+            {
+                continue;
+            }
+            WeaponInstance instance = pickup.Weapon;
+            var entry = WeaponInfo.Find(TableManager.Instance.Weapon, pickup.WeaponId);
+            entries.Add(new LogAmmoWeaponSnapshot { instanceId = telemetry.Session.GetWeaponId(instance),
+                weaponTypeId = pickup.WeaponId, ammoTypeId = entry?.ammoId, location = "floor",
+                loadedAmmo = instance != null ? instance.Magazine : (int?)null });
+        }
+        return new LogAmmoSnapshot { reserves = player.reserves, weapons = entries.ToArray() };
+    }
+
+    private void ObserveNewLogWeapon(WeaponInstance _weapon, string _source)
+    {
+        if (_weapon == null)
+        {
+            return;
+        }
+        var entry = WeaponInfo.Find(TableManager.Instance.Weapon, _weapon.WeaponId);
+        logAmmo?.Weapon(_source, _weapon, entry?.ammoId, _weapon.Magazine);
+    }
+
+    private void ObserveLogWeaponMove(WeaponInstance _weapon, string _source)
+    {
+        if (_weapon == null)
+        {
+            return;
+        }
+        var entry = WeaponInfo.Find(TableManager.Instance.Weapon, _weapon.WeaponId);
+        logAmmo?.Weapon(_source, _weapon, entry?.ammoId, _weapon.Magazine);
     }
 
     private LogWavePlan CaptureLogPlan()

@@ -191,7 +191,7 @@ internal static class Program
                 unique.Add(first.NewId(kind));
                 unique.Add(first.NewId(kind));
             }
-            Check(unique.Count == 10 && unique.All(_id => _id.StartsWith(first.SessionId + ":", StringComparison.Ordinal)), "shot projectile spin purchase and weapon namespaces do not collide");
+            Check(unique.Count == 2 * Enum.GetValues(typeof(LogIdKind)).Length && unique.All(_id => _id.StartsWith(first.SessionId + ":", StringComparison.Ordinal)), "all registered ID namespaces remain unique within a session");
             Check(!first.TryReviseSummary(1, out _, out _), "unclosed summary cannot be revised");
             Check(first.TryCloseSummary(1, out string summary) && !first.TryCloseSummary(1, out _), "wave summary closes once");
             Check(first.TryReviseSummary(1, out string revised, out int revision) && revised == summary && revision == 1, "late result references original key with increasing revision");

@@ -77,7 +77,7 @@ public static class SlotRewardInfo
     }
 
     // 계획을 실제 보유 상태에 반영한다. 탄약은 한도(최대 예비탄)를 넘기지 않고, 파츠는 보관함에 개별로 넣는다(장착하지 않는다).
-    public static void Apply(Reward _reward, AmmoInventory _ammo, PartInventory _parts, PlayerWallet _wallet)
+    public static void Apply(Reward _reward, AmmoInventory _ammo, PartInventory _parts, PlayerWallet _wallet, string _causeId = null)
     {
         if (_reward == null)
         {
@@ -85,7 +85,7 @@ public static class SlotRewardInfo
         }
         if (_reward.ammoId != null && _ammo != null)
         {
-            _ammo.Add(_reward.ammoId, _reward.ammoAmount);
+            _ammo.Add(_reward.ammoId, _reward.ammoAmount, "slot_reserve", _causeId);
         }
         if (_parts != null)
         {

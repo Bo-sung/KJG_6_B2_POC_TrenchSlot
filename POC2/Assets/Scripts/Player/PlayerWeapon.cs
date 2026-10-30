@@ -8,6 +8,7 @@ using UnityEngine.InputSystem;
 // 휴대 슬롯 전환 입력은 여기서 받아 알리기만 하고, 실제 전환은 GameManager가 한다.
 public sealed class PlayerWeapon : MonoBehaviour
 {
+    public LogAmmoCollector AmmoLog { get; set; }
     [Serializable]
     public struct WeaponSettings
     {
@@ -214,6 +215,7 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     private void OnDisable()
     {
+        AmmoLog?.FireInput(false);
         CancelReload();
         ResetAim();
         fireAction?.action?.Disable();
@@ -242,6 +244,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     {
         if (health != null && !health.IsAlive)
         {
+            AmmoLog?.FireInput(false);
             CancelReload();
             ResetAim();
             return;
@@ -250,6 +253,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 정비 상점·게임 오버 중에는 사격·재장전·전환을 막는다. 슬롯 회전 중에는 막지 않는다.
         if (!InputGate.PlayerEnabled)
         {
+            AmmoLog?.FireInput(false);
             CancelReload();
             ResetAim();
             return;
@@ -280,15 +284,21 @@ public sealed class PlayerWeapon : MonoBehaviour
         }
         else if (wantsReload)
         {
+            if (!isReloading && NeedsReload() && ReserveAmmo <= 0)
+            {
+                AmmoLog?.Shortage(AmmoId, "reload");
+            }
             StartReload();
         }
 
         if (fireAction == null || fireAction.action == null)
         {
+            AmmoLog?.FireInput(false);
             return;
         }
 
         bool wantsFire = settings.automatic ? fireAction.action.IsPressed() : fireAction.action.WasPressedThisFrame();
+        AmmoLog?.FireInput(wantsFire);
         if (wantsFire)
         {
             TryFire();
@@ -310,7 +320,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 연사 간격은 무기 개체에 남아 있으므로 초기화하지 않는다(슬롯 전환으로 간격을 건너뛰지 못한다).
         nextHand = 0;
         LastFiredHand = 0;
-        MainAmmo = Mathf.Clamp(MainAmmo, 0, Mathf.Max(0, settings.magazineSize));
+        ClampHandAmmo(0, settings.magazineSize);
         AmmoChanged?.Invoke(Ammo, MagazineSize);
     }
 
@@ -329,7 +339,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         offHand = _off;
         offSettings = _offSettings;
         akimboReloadMultiplier = Mathf.Max(0f, _reloadMultiplier);
-        offHand.Magazine = Mathf.Clamp(offHand.Magazine, 0, Mathf.Max(0, offSettings.magazineSize));
+        ClampHandAmmo(1, offSettings.magazineSize);
         AmmoChanged?.Invoke(Ammo, MagazineSize);
     }
 
@@ -337,7 +347,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     public void UpdateSettings(WeaponSettings _settings)
     {
         settings = _settings;
-        MainAmmo = Mathf.Clamp(MainAmmo, 0, Mathf.Max(0, settings.magazineSize));
+        ClampHandAmmo(0, settings.magazineSize);
         AmmoChanged?.Invoke(Ammo, MagazineSize);
     }
 
@@ -352,7 +362,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         if (akimbo && _weapon != null && _weapon == offHand)
         {
             offSettings = _settings;
-            offHand.Magazine = Mathf.Clamp(offHand.Magazine, 0, Mathf.Max(0, offSettings.magazineSize));
+            ClampHandAmmo(1, offSettings.magazineSize);
             AmmoChanged?.Invoke(Ammo, MagazineSize);
             return true;
         }
@@ -374,6 +384,24 @@ public sealed class PlayerWeapon : MonoBehaviour
         }
         isReloading = false;
         AmmoChanged?.Invoke(Ammo, MagazineSize);
+    }
+
+    private void ClampHandAmmo(int _hand, int _maximum)
+    {
+        int before = HandAmmo(_hand);
+        int after = Mathf.Clamp(before, 0, Mathf.Max(0, _maximum));
+        if (_hand == 0)
+        {
+            MainAmmo = after;
+        }
+        else
+        {
+            offHand.Magazine = after;
+        }
+        if (before > after)
+        {
+            AmmoLog?.Shrink(Hand(_hand), AmmoId, before - after, 0, null);
+        }
     }
 
     public void StartReload()
@@ -488,6 +516,7 @@ public sealed class PlayerWeapon : MonoBehaviour
                 {
                     offHand.Magazine++;
                 }
+                AmmoLog?.Reload(Hand(hand), AmmoId, hand, 1);
             }
             if (NeedsReload() && ReserveAmmo > 0 && reloadDuration > 0f)
             {
@@ -524,19 +553,32 @@ public sealed class PlayerWeapon : MonoBehaviour
         {
             offHand.Magazine += added;
         }
+        AmmoLog?.Reload(Hand(_hand), AmmoId, _hand, added);
     }
 
     // 슬롯 탄약 심볼: 공유 예비탄을 차감하지 않고 사용 중인 무기 탄창을 즉시 채운다. 아킴보면 양손 모두 채운다.
     public void GrantSlotAmmo()
     {
+        GrantSlotAmmoForCause(null);
+    }
+
+    public void GrantSlotAmmoForCause(string _causeId)
+    {
         if (health != null && !health.IsAlive)
         {
             return;
         }
+        int beforeRight = MainAmmo;
+        int beforeLeft = akimbo ? offHand.Magazine : 0;
         MainAmmo = HandMagazineSize(0);
         if (akimbo)
         {
             offHand.Magazine = HandMagazineSize(1);
+        }
+        AmmoLog?.Weapon("slot_loaded", Hand(0), AmmoId, MainAmmo - beforeRight, "right", _causeId);
+        if (akimbo)
+        {
+            AmmoLog?.Weapon("slot_loaded", Hand(1), AmmoId, offHand.Magazine - beforeLeft, "left", _causeId);
         }
         // 탄창이 다 찼으니 진행 중이던 재장전은 더 할 일이 없다(예비탄 소비 없이 끝낸다).
         if (isReloading && !NeedsReload())
@@ -592,8 +634,9 @@ public sealed class PlayerWeapon : MonoBehaviour
     }
 
     // 한 발 소비: 장전탄(탄 절감 판정 _saveRoll이 확률 미만이면 소비 없음), 그 손의 연사 간격, 다음 차례 손을 갱신한다.
-    private void TakeShot(int _hand, float _now, float _saveRoll)
+    private int TakeShot(int _hand, float _now, float _saveRoll)
     {
+        int ammoBefore = HandAmmo(_hand);
         var handSettings = HandSettings(_hand);
         if (handSettings.ammoSaveChance <= 0f || _saveRoll >= handSettings.ammoSaveChance)
         {
@@ -609,7 +652,9 @@ public sealed class PlayerWeapon : MonoBehaviour
         SetHandNextShotTime(_hand, _now + 1f / handSettings.shotsPerSecond);
         LastFiredHand = _hand;
         nextHand = akimbo ? 1 - _hand : 0;
+        int consumed = Mathf.Max(0, ammoBefore - HandAmmo(_hand));
         AmmoChanged?.Invoke(Ammo, MagazineSize);
+        return consumed;
     }
 
     private void TryFire()
@@ -626,11 +671,23 @@ public sealed class PlayerWeapon : MonoBehaviour
         int hand = PickHand(Time.time);
         if (hand < 0)
         {
+            bool empty = true;
+            bool ready = false;
+            for (int i = 0; i < HandCount; i++)
+            {
+                empty &= HandAmmo(i) <= 0;
+                var candidate = HandSettings(i);
+                ready |= Time.time >= HandNextShotTime(i) && candidate.shotsPerSecond > 0f && candidate.range > 0f;
+            }
+            AmmoLog?.EmptyFire(AmmoId, settings.automatic, empty && ready);
             return;
         }
         var handSettings = HandSettings(hand);
         WeaponInstance firingWeapon = Hand(hand);
-        TakeShot(hand, Time.time, handSettings.ammoSaveChance > 0f ? UnityEngine.Random.value : 1f);
+        string firingAmmoId = AmmoId;
+        int ammoBeforeShot = HandAmmo(hand);
+        int ammoConsumed = TakeShot(hand, Time.time, handSettings.ammoSaveChance > 0f ? UnityEngine.Random.value : 1f);
+        int ammoAfterShot = ammoBeforeShot - ammoConsumed;
         Fired?.Invoke();
         HandFired?.Invoke(hand);
         SoundPlayer.Play(SfxType.Shot);
@@ -652,6 +709,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         int group = pellets > 1 ? ++pelletGroupCounter : 0;
         LogShotContext logShot = CombatLog?.StartShot(firingWeapon, firingWeapon?.WeaponId, hand,
             new LogPosition3 { x = origin.x, y = origin.y, z = origin.z }, pellets, Ammo, ReserveAmmo, akimbo, IsAiming);
+        AmmoLog?.Shot(logShot, firingAmmoId, ammoBeforeShot, ammoAfterShot);
         var shot = new Projectile.Shot
         {
             team = Projectile.Team.Player,
