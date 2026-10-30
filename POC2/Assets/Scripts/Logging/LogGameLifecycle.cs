@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 public sealed class LogGameLifecycle
 {
     private readonly LogSession session;
+    private readonly List<ILogSessionEndObserver> endObservers = new List<ILogSessionEndObserver>();
     private readonly Dictionary<string, ILogWaveSummaryCollector> collectors = new Dictionary<string, ILogWaveSummaryCollector>(StringComparer.Ordinal);
     private readonly HashSet<string> failedCollectors = new HashSet<string>(StringComparer.Ordinal);
     private bool started;
@@ -64,6 +65,16 @@ public sealed class LogGameLifecycle
             return false;
         }
         collectors.Add(_collector.Key, _collector);
+        return true;
+    }
+
+    public bool RegisterSessionEndObserver(ILogSessionEndObserver _observer)
+    {
+        if (ended || ending || _observer == null || endObservers.Contains(_observer))
+        {
+            return false;
+        }
+        endObservers.Add(_observer);
         return true;
     }
 
@@ -185,6 +196,17 @@ public sealed class LogGameLifecycle
             {
                 CloseWave("interrupted", reason, _player, _enemiesBeforeCleanup, null, null);
             }
+            foreach (ILogSessionEndObserver observer in endObservers.ToArray())
+            {
+                try
+                {
+                    observer.SessionEnding(reason);
+                }
+                catch (Exception exception)
+                {
+                    session.ReportCollectionFailure(exception);
+                }
+            }
             session.SetContext(finalReachedWave, "ended");
             session.TryRecord("session_end", new
             {
@@ -199,6 +221,7 @@ public sealed class LogGameLifecycle
         finally
         {
             ended = true;
+            endObservers.Clear();
             waveOpen = false;
             session.Dispose();
         }

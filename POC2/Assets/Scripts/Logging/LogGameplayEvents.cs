@@ -37,32 +37,6 @@ public sealed class LogGameplayEvents
         WriteSlot("SpinRejected", _cost, _balance, _reason);
     }
 
-    public void SlotSpinStarted(int _cost, int _balance, float _spinSeconds, int[] _faces, float _healthRestored, float _health)
-    {
-        if (!lifecycle.IsActive || !lifecycle.Session.IsRecording)
-        {
-            return;
-        }
-        Write(CATEGORY_SLOT, "SpinStarted", new SlotSpinStartedEvent
-        {
-            cost = _cost,
-            balance = _balance,
-            spinSeconds = _spinSeconds,
-            faces = _faces != null ? (int[])_faces.Clone() : Array.Empty<int>(),
-            healthRestored = _healthRestored,
-            health = _health
-        });
-    }
-
-    public void SlotSpinResolved(SlotSpinResolvedEvent _result)
-    {
-        if (!lifecycle.IsActive || !lifecycle.Session.IsRecording)
-        {
-            return;
-        }
-        Write(CATEGORY_SLOT, "SpinResolved", _result);
-    }
-
     private void WriteSlot(string _event, int _cost, int _balance, string _reason)
     {
         if (!lifecycle.IsActive || !lifecycle.Session.IsRecording)
@@ -139,8 +113,6 @@ public sealed class LogGameplayEvents
                 case "IntermissionStarted": name = "intermission_started"; break;
                 case "SpinRequested": name = "spin_requested"; break;
                 case "SpinRejected": name = "spin_rejected"; break;
-                case "SpinStarted": name = "spin_started"; break;
-                case "SpinResolved": name = "spin_resolved"; break;
                 case "PurchaseSucceeded": name = "purchase_succeeded"; break;
                 case "PurchaseFailed": name = "purchase_failed"; break;
                 case "WeaponDropped": name = "dropped"; break;

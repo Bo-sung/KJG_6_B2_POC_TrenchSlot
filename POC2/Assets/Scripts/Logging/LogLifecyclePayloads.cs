@@ -50,3 +50,8 @@ public interface ILogWaveSummaryCollector
     void BeginWave(LogWaveBoundary _boundary);
     object CloseWave(LogWaveBoundary _boundary);
 }
+
+public interface ILogSessionEndObserver
+{
+    void SessionEnding(string _reason);
+}

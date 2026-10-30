@@ -9,11 +9,13 @@ public sealed partial class GameManager
     private LogFixedTickCollector logFixedTicks;
     private LogCombatCollector logCombat;
     private LogAmmoCollector logAmmo;
+    private LogSlotCollector logSlots;
     private bool loggingInitialized;
     private float? logDeathRadius;
 
     public LogGameLifecycle Telemetry => telemetry;
     public LogGameplayEvents GameplayLog => gameplayLog;
+    public LogSlotCollector SlotLog => logSlots;
 
     private void InitializeLogging()
     {
@@ -36,6 +38,8 @@ public sealed partial class GameManager
             logFixedTicks = new LogFixedTickCollector(telemetry);
             logCombat = new LogCombatCollector(telemetry);
             logAmmo = new LogAmmoCollector(telemetry, CaptureLogAmmo);
+            logSlots = new LogSlotCollector(telemetry);
+            logAmmo.Observed += logSlots.ObserveAmmo;
             telemetry.RegisterCollector(logCombat);
             telemetry.RegisterCollector(logAmmo);
             string fingerprint = null;
@@ -183,6 +187,10 @@ public sealed partial class GameManager
 
     private void DetachCombatLogging()
     {
+        if (logAmmo != null && logSlots != null)
+        {
+            logAmmo.Observed -= logSlots.ObserveAmmo;
+        }
         if (ammo != null && ReferenceEquals(ammo.AmmoLog, logAmmo))
         {
             ammo.AmmoLog = null;
@@ -291,6 +299,20 @@ public sealed partial class GameManager
             }
             snapshot.reserves = reserves.ToArray();
         }
+        return snapshot;
+    }
+
+    public LogSlotState CaptureSlotLogState()
+    {
+        LogSlotState snapshot = null;
+        ObserveLogging(() => snapshot = new LogSlotState
+        {
+            waveNumber = telemetry.Session.WaveNumber,
+            phase = telemetry.Session.Phase,
+            elapsedSeconds = telemetry.Session.ElapsedSeconds,
+            player = CaptureLogPlayer(),
+            enemies = CaptureLogEnemies()
+        });
         return snapshot;
     }
 

@@ -14,6 +14,9 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
 
     private bool spinning;
     private bool payoutInProgress;
+    private object spinOperation;
+    private LogSpinContext activeLogSpin;
+    private LogSlotCollector activeSlotLog;
     // 마지막으로 회전을 시작한 웨이브 번호. 이월 저금통 판정용(0이면 아직 회전 없음).
     private int lastSpinWave;
 
@@ -74,6 +77,7 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         }
 
         int cost = CurrentCost;
+        LogSlotState logBefore = gameManager.CaptureSlotLogState();
         gameManager?.GameplayLog?.SlotSpinRequested(cost, gameManager.Wallet.Balance);
         // 잔액/체력 변경 이벤트의 재진입으로 한 회전에 중복 결제·회복하지 않도록 먼저 잠근다.
         spinning = true;
@@ -91,9 +95,20 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         int wave = gameManager.WaveNumber;
         bool piggyEligible = wave > 1 && lastSpinWave < wave - 1;
         float piggy = gameManager.Perks.PiggyBankMultiplier(piggyEligible);
-        bool started = reels.BeginSpin(faces, seconds, () => OnSpinStopped(outcome, piggy, wave));
+        object operation = new object();
+        spinOperation = operation;
+        bool started = reels.BeginSpin(faces, seconds, () =>
+        {
+            if (!ReferenceEquals(spinOperation, operation))
+            {
+                return;
+            }
+            spinOperation = null;
+            OnSpinStopped(outcome, piggy, wave);
+        });
         if (!started)
         {
+            spinOperation = null;
             gameManager.Wallet.Add(cost);
             spinning = false;
             gameManager?.GameplayLog?.SlotSpinRejected("ReelsBusy", cost, gameManager.Wallet.Balance);
@@ -101,9 +116,11 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         }
 
         lastSpinWave = wave;
+        activeSlotLog = gameManager.SlotLog;
+        activeLogSpin = activeSlotLog?.Start(this, cost, SlotMachineInfo.SpinCost(Table), seconds, faces, SymbolIds(faces), logBefore);
         float healed = gameManager.RecoverForSlotSpin(SlotMachineInfo.SpinHealAmount(Table));
+        activeSlotLog?.Healed(activeLogSpin, healed, gameManager.CurrentHealth);
         if (healed > 0f) SpinHealed?.Invoke(healed);
-        gameManager?.GameplayLog?.SlotSpinStarted(cost, gameManager.Wallet.Balance, seconds, faces, healed, gameManager.CurrentHealth);
         SpinStarted?.Invoke(cost);
     }
 
@@ -132,6 +149,27 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         return faces;
     }
 
+    private static string[] SymbolIds(int[] _faces)
+    {
+        var ids = new string[_faces.Length];
+        for (int i = 0; i < _faces.Length; i++)
+        {
+            if (Table?.symbols == null)
+            {
+                continue;
+            }
+            foreach (var symbol in Table.symbols)
+            {
+                if (symbol != null && symbol.reelIndex == _faces[i])
+                {
+                    ids[i] = symbol.id;
+                    break;
+                }
+            }
+        }
+        return ids;
+    }
+
     // _spinWave는 회전을 시작한 웨이브다. 정비 중에 결과가 나와도 시대·파츠 계획은 이 값을 쓴다.
     private void OnSpinStopped(SlotOutcome _outcome, float _piggyMultiplier, int _spinWave)
     {
@@ -144,14 +182,17 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         {
             var text = new StringBuilder();
             int payout = 0;
+            double? cashBonus = null;
+            LogSlotState beforePayout = gameManager.CaptureSlotLogState();
 
             SlotRewardInfo.Reward reward = gameManager.PlanSlotReward(_spinWave, _outcome);
-            SlotRewardInfo.Apply(reward, gameManager.Ammo, gameManager.Parts, gameManager.Wallet);
+            SlotRewardInfo.Apply(reward, gameManager.Ammo, gameManager.Parts, gameManager.Wallet, activeLogSpin?.SpinId);
             string rewardText = SlotRewardInfo.Describe(reward, Shop, TableManager.Instance.Part, TableManager.Instance.Ammo);
 
             if (_outcome.multiplier > 0)
             {
                 float bonus = (1f + gameManager.Perks.KillBonusPerKill * gameManager.KillsThisWave) * gameManager.Perks.PayoutMultiplier * _piggyMultiplier;
+                cashBonus = bonus;
                 payout = Mathf.FloorToInt(SlotMachineInfo.SpinCost(Table) * _outcome.multiplier * bonus);
                 gameManager.Wallet.Add(payout);
                 bool triple = _outcome.tripleFace >= 0;
@@ -166,6 +207,13 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
             {
                 text.Append("아깝다!");
             }
+            LogSlotState afterPayout = gameManager.CaptureSlotLogState();
+            activeSlotLog?.Resolve(activeLogSpin, beforePayout, afterPayout, new LogSlotOutcome
+            {
+                tripleFace = _outcome.tripleFace, pairFace = _outcome.pairFace, multiplier = _outcome.multiplier,
+                hasAmmo = _outcome.hasAmmo, partCount = _outcome.partCount, nextEraPartCount = _outcome.nextEraPartCount,
+                isMiss = _outcome.isMiss, isNearMiss = _outcome.isNearMiss
+            }, _piggyMultiplier, cashBonus, payout, reward.partIds.ToArray());
 
             if (rewardText.Length > 0)
             {
@@ -202,27 +250,19 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
             }
 
             spinning = false;
-            gameManager?.GameplayLog?.SlotSpinResolved(new SlotSpinResolvedEvent
-            {
-                multiplier = _outcome.multiplier,
-                payout = payout,
-                rewardCash = reward.cash,
-                rewardAmmoId = reward.ammoId,
-                rewardAmmoAmount = reward.ammoAmount,
-                ammoRefill = reward.ammoRefill,
-                rewardPartIds = reward.partIds.ToArray(),
-                nearMiss = _outcome.isNearMiss,
-                piggyMultiplier = _piggyMultiplier,
-                balance = gameManager.Wallet.Balance,
-                magazineAmmo = weapon != null ? weapon.Ammo : 0,
-                reserveAmmo = weapon != null ? weapon.ReserveAmmo : 0
-            });
             SpinResolved?.Invoke(_outcome, payout, text.ToString());
+        }
+        catch
+        {
+            activeSlotLog?.Incomplete(activeLogSpin, "payout_interrupted");
+            throw;
         }
         finally
         {
             spinning = false;
             payoutInProgress = false;
+            activeLogSpin = null;
+            activeSlotLog = null;
         }
     }
 }

@@ -61,6 +61,7 @@ public sealed class LogAmmoCollector : ILogWaveSummaryCollector
     private bool emptyHoldCounted;
 
     public string Key => "ammo";
+    public event Action<LogAmmoChange> Observed;
 
     public LogAmmoCollector(LogGameLifecycle _lifecycle, Func<LogAmmoSnapshot> _capture)
     {
@@ -124,6 +125,20 @@ public sealed class LogAmmoCollector : ILogWaveSummaryCollector
                 }
             }
             lifecycle.Session.TryRecord("ammo_changed", _change);
+            if (Observed != null)
+            {
+                foreach (Action<LogAmmoChange> observer in Observed.GetInvocationList())
+                {
+                    try
+                    {
+                        observer(_change);
+                    }
+                    catch (Exception exception)
+                    {
+                        lifecycle.Session.ReportCollectionFailure(exception);
+                    }
+                }
+            }
         });
     }
 

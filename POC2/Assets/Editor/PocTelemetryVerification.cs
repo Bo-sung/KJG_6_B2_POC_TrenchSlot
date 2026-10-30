@@ -48,6 +48,37 @@ public static class PocTelemetryVerification
             Require(group.Select(_row => (int)_row["payload"]["revision"]).SequenceEqual(Enumerable.Range(0, group.Count())),
                 "Summary revisions must start at zero and increase once per correction");
         }
+        var starts = rows.Where(_row => (string)_row["eventType"] == "slot_spin_started").ToArray();
+        var terminals = rows.Where(_row => (string)_row["eventType"] == "slot_spin_resolved" ||
+            (string)_row["eventType"] == "slot_spin_incomplete").ToArray();
+        Require(starts.All(_row => !string.IsNullOrEmpty((string)_row["payload"]["spinId"])), "Missing spin ID");
+        Require(starts.Select(_row => (string)_row["payload"]["spinId"]).Distinct().Count() == starts.Length, "Duplicate spin start");
+        Require(terminals.Length == starts.Length, "Each spin must resolve or close incomplete before session end");
+        foreach (JObject start in starts)
+        {
+            string id = (string)start["payload"]["spinId"];
+            var results = terminals.Where(_row => (string)_row["payload"]["spinId"] == id).ToArray();
+            Require(results.Length == 1 && (long)results[0]["sequence"] > (long)start["sequence"], "Spin terminal identity or order mismatch");
+            Require(start["payload"]["faces"] is JArray faces && faces.Count == 3, "Expected original three faces");
+            if ((string)results[0]["eventType"] == "slot_spin_resolved")
+            {
+                Require(JToken.DeepEquals(start["payload"]["faces"], results[0]["payload"]["faces"]) &&
+                    JToken.DeepEquals(start["payload"]["symbolIds"], results[0]["payload"]["symbolIds"]), "Spin result changed its original symbols");
+                foreach (JToken grant in results[0]["payload"]["ammoGranted"])
+                {
+                    string transactionId = (string)grant["transactionId"];
+                    var originals = rows.Where(_row => (string)_row["eventType"] == "ammo_changed" &&
+                        (string)_row["payload"]["transactionId"] == transactionId).ToArray();
+                    Require(!string.IsNullOrEmpty(transactionId) && (string)grant["causeId"] == id &&
+                        originals.Length == 1 && JToken.DeepEquals(originals[0]["payload"], grant), "Slot ammo grant does not match canonical transaction");
+                }
+            }
+            else
+            {
+                Require(results[0]["payload"]["outcome"] == null && results[0]["payload"]["actualMoneyDelta"] == null,
+                    "Incomplete spin contains invented reward");
+            }
+        }
         Debug.Log("[PocTelemetryVerification] PASS: " + rows.Length + " unified records in " + file);
     }
 

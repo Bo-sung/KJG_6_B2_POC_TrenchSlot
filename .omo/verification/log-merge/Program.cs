@@ -24,6 +24,9 @@ internal static class Program
         var life = new LogGameLifecycle(session);
         var events = new LogGameplayEvents(life);
         var combat = new LogCombatCollector(life);
+        var slots = new LogSlotCollector(life);
+        var ammo = new LogAmmoCollector(life, () => null);
+        ammo.Observed += slots.ObserveAmmo;
         life.RegisterCollector(combat);
         events.SlotSpinRequested(10, 100);
         Check(session.Sequence == 0, "No phantom events before session start");
@@ -33,14 +36,18 @@ internal static class Program
         events.SlotSpinRequested(10, 100);
         events.SlotSpinRejected("ReelsBusy", 10, 100);
         int[] faces = { 1, 2, 3 };
-        events.SlotSpinStarted(10, 90, 1, faces, 3, 50);
+        var slotBefore = new LogSlotState { waveNumber = 1, phase = "wave",
+            player = new LogPlayerSnapshot { money = 100, health = 47 } };
+        var spin = slots.Start(new object(), 10, 10, 1, faces, new[] { "a", "b", "c" }, slotBefore);
+        slots.Healed(spin, 3, 50);
         faces[0] = 99;
-        events.SlotSpinResolved(new SlotSpinResolvedEvent
+        ammo.Change(new LogAmmoChange
         {
-            multiplier = 2, payout = 20, rewardCash = 3, rewardAmmoId = "rifle",
-            rewardAmmoAmount = 5, ammoRefill = true, rewardPartIds = new[] { "part" },
-            nearMiss = true, piggyMultiplier = 1.5f, balance = 113, magazineAmmo = 7, reserveAmmo = 9
+            source = "slot_reserve", ammoTypeId = "rifle", reserveDelta = 5, acquired = 5, causeId = spin.SpinId
         });
+        slots.Resolve(spin, new LogSlotState { player = new LogPlayerSnapshot { money = 90 } },
+            new LogSlotState { player = new LogPlayerSnapshot { money = 113 } },
+            new LogSlotOutcome { multiplier = 2, isNearMiss = true }, 1.5, 1.5, 20, new[] { "part" });
         events.ShopPurchase("Ammo", "rifle", "", 113, 103);
         events.ShopPurchase("Weapon", "pistol", "InsufficientFunds", 103, 103);
         events.WeaponDropped("pistol", 5, "PickupSwap");
@@ -60,7 +67,7 @@ internal static class Program
         events.IntermissionStarted(5, 103);
         life.End("death", null, null, true);
         long closed = session.Sequence;
-        events.SlotSpinResolved(new SlotSpinResolvedEvent());
+        slots.Resolve(spin, null, null, null, 1, null, 0);
         combat.PlayerDamaged(null, 90, 0);
         Check(session.Sequence == closed, "Late callbacks do not reopen ended session");
         var rows = store.Lines.Select(JObject.Parse).ToArray();
@@ -72,9 +79,9 @@ internal static class Program
         }
         Check(rows.Select(_r => (long)_r["sequence"]).SequenceEqual(Enumerable.Range(1, rows.Length).Select(_n => (long)_n)), "One consecutive sequence");
         Check((int)row("slot_spin_started")["payload"]["faces"][0] == 1, "Slot payload copied immediately");
-        Check((float)row("slot_spin_started")["payload"]["healthRestored"] == 3, "Actual heal preserved");
-        Check((string)row("slot_spin_resolved")["payload"]["rewardPartIds"][0] == "part", "Part reward preserved");
-        Check((int)row("slot_spin_resolved")["payload"]["rewardAmmoAmount"] == 5, "Ammo reward preserved");
+        Check((float)row("slot_spin_healed")["payload"]["actualHealthRestored"] == 3, "Actual heal preserved");
+        Check((string)row("slot_spin_resolved")["payload"]["plannedPartIds"][0] == "part", "Part reward plan preserved");
+        Check((int)row("slot_spin_resolved")["payload"]["ammoGranted"][0]["acquired"] == 5, "Actual ammo reward preserved");
         Check((int)row("shop_purchase_succeeded")["payload"]["spentAmount"] == 10, "Actual spending preserved");
         Check((int)row("shop_purchase_failed")["payload"]["spentAmount"] == 0, "Failed purchase not represented as quoted price");
         Check((bool)row("player_shot")["payload"]["aiming"] && (bool)row("player_shot")["payload"]["akimbo"], "Shot posture preserved");

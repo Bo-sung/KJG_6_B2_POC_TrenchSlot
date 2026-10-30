@@ -12,7 +12,8 @@
 기존 지표를 분석할 때는 player_shot, projectile_impact, player_damage와 웨이브 요약을 사용한다.
 같은 summaryId에서는 revision이 가장 큰 전체 요약만 채택한다.
 
-`LogGameplayEvents`는 기존 슬롯·구매·무기 이동 관측을 같은 LogSession에 기록하는 세션별 어댑터다.
+`LogGameplayEvents`는 슬롯 요청/거부·구매·무기 이동 관측을 같은 LogSession에 기록하는 세션별 어댑터다.
+5차의 `LogAmmoCollector`가 탄약 경제를, 6차의 `LogSlotCollector`가 성공한 회전의 spinId·시작/결과·미완료를 소유한다.
 GameManager가 소유하므로 다른 게임 세션의 전역 상태를 참조하지 않는다. 시작 전·종료 후에는 기록하지 않는다.
 현금·탄약·파츠 보상, 실제 슬롯 회복량, 구매 실패, 교체 무기, 탄창 정보가 유지된다.
 구매 금액은 정가가 아닌 실제 잔액 감소량이므로 payload 필드는 `spentAmount`이다.
@@ -58,4 +59,7 @@ Play Mode를 종료한 뒤 `Tools > POC > Verify Unified Telemetry File`을 실�
 인스펙터 할당 필드·기존 에디터 자료 관련 경고는 런타임 103개, 에디터 포함 115개다.
 재현 명령은 `.omo/verification/log-merge/README.md`에 기록했다.
 
-슬롯의 원인/결과 spinId, 구매 시도 purchaseAttemptId, 슬롯·경제 요약 등 원 설계의 후속 단계 전체를 이번 호환 통합만으로 구현 완료한 것은 아니다.
+후속 5~6차에서 탄약 경제 요약과 슬롯 spinId·실제 지급·미완료 마감을 구현했다.
+슬롯 결과는 실제 ammo_changed를 transactionId로 참조하며 획득량을 다시 집계하지 않는다.
+6차 검사는 112개, 현재 통합 회귀는 320개가 통과했다. 상세는 `Docs/로그-시스템-6차-계약.md` 참조.
+구매 시도 purchaseAttemptId·상점 상세는 7차, 전체 운영 통합 검증은 8차다.
