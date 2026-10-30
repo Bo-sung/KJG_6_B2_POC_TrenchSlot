@@ -9,7 +9,7 @@ using UnityEngine.AI;
 public static class PocCoverAuthoring
 {
     public const string SCENE = "Assets/Scenes/Game.unity";
-    public const string NAV_DATA = "Assets/Scenes/GameEnemyNavigation.asset";
+    public const string NAV_DATA = "Assets/Scenes/Game/NavMesh-EnemyNavigationSurface.asset";
     public const string ENEMY_PREFAB = "Assets/Prefabs/Gameplay/Enemy.prefab";
 
     public static void AuthorSavedGame()
