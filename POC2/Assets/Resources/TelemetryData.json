@@ -7,7 +7,7 @@
   "uploadEnabled": false,
   "developmentServerUrl": "",
   "releaseServerUrl": "",
-  "apiKey": "",
+  "apiKey": "dev-log-key",
   "uploadIntervalSeconds": 5,
   "requestTimeoutSeconds": 5,
   "retryPendingOnStartup": true

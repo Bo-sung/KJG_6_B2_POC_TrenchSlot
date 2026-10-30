@@ -50,11 +50,11 @@
 | logShotEvents / logHitEvents | true | 발사·적중 상세 줄. 끄면 `Attack`/`AttackHit` 지표만 남는다 |
 | uploadEnabled | **false** | 서버 전송. 꺼져 있으면 로컬 JSONL만 남기고 기동 재전송도 하지 않는다 |
 | developmentServerUrl / releaseServerUrl | "" | 빈 값이면 LogKit 기본 `http://localhost:5000/api/logs`. 에디터·Development 빌드는 development, 릴리스 빌드는 release 주소 사용 |
-| apiKey | "" | 빈 값이면 LogKit 기본 개발 키 |
+| apiKey | `dev-log-key` | 공개된 개발용 기본 키. 운영 키는 로컬 설정으로 덮어쓴다 |
 | uploadIntervalSeconds / requestTimeoutSeconds / retryPendingOnStartup | 5 / 5 / true | 전송이 켜졌을 때만 의미 있음 |
 
 ### 서버 URL·키 설정 (로컬 전용, 커밋 금지)
-저장소 JSON에는 주소·키를 넣지 않는다. `Assets/Resources/TelemetryLocalData.json`(Git 제외)을 만들면 적힌 항목만 덮어쓴다.
+저장소 JSON에는 공개된 개발용 기본 키 `dev-log-key`만 둔다. 실제 서버 주소·운영 키는 `Assets/Resources/TelemetryLocalData.json`(Git 제외)에 넣으면 적힌 항목만 덮어쓴다.
 ```json
 {
   "uploadEnabled": true,
