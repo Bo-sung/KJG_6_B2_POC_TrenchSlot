@@ -26,6 +26,7 @@ public sealed class TableManager
     public ShopData Shop { get; private set; }
     public PerkData Perk { get; private set; }
     public GameConfigData GameConfig { get; private set; }
+    public WeaponAimData WeaponAim { get; private set; }
 
     private TableManager()
     {
@@ -67,6 +68,7 @@ public sealed class TableManager
 
         GameConfig = Load<GameConfigData>(nameof(GameConfigData));
         GameConfigInfo.Validate(GameConfig);
+        WeaponAim = Load<WeaponAimData>(nameof(WeaponAimData));
     }
 
     /// <summary>반복 호출해도 테이블을 다시 읽지 않는다.</summary>

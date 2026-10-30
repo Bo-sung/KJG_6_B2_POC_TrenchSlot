@@ -28,7 +28,7 @@ public static class PocShopVerification
         Check(table.Weapon.weapons.Length == 11 && WeaponInfo.StartWeaponId(table.Weapon) == "m1873", "무기 11종, 시작 무기 M1873");
         Check(table.Ammo.ammoTypes.Length == 8 && AmmoInfo.Find(table.Ammo, "colt45") != null, "세부 탄종 8종");
         Check(table.Part.parts.Length == 9, "POC 파츠 9종(1887 3종)");
-        Check(WeaponInfo.Find(table.Weapon, "m1873").ammoId == WeaponInfo.Find(table.Weapon, "colt1878").ammoId, "M1873과 Colt 1878은 .45 Colt를 공유한다");
+        Check(WeaponInfo.Find(table.Weapon, "m1873").ammoId == "colt45" && WeaponInfo.Find(table.Weapon, "colt1878").ammoId == "ga12", "Colt 1878은 12게이지 산탄총이다");
 
         // 시대 진열(1~5 / 6~10 / 11~ 누적)
         Check(ShopInfo.EraForWave(shop, 1).id == "1887" && ShopInfo.EraForWave(shop, 5).id == "1887", "1~5웨이브는 1887");
@@ -45,7 +45,7 @@ public static class PocShopVerification
         Check(ShopInfo.StatPrice(shop, maxHealth, 0) == 100 && ShopInfo.StatPrice(shop, maxHealth, 1) == 250 && ShopInfo.StatPrice(shop, maxHealth, 2) == 625, "최대 체력 가격 100 → 250 → 625");
         Check(ShopInfo.StatPrice(shop, moveSpeed, 1) == 375 && ShopInfo.StatPrice(shop, moveSpeed, 2) % 5 == 0, "스탯 가격은 2.5배씩 오르고 $5 단위로 반올림");
         Check(ShopInfo.PartPrice(shop, PartInfo.Find(table.Part, "win1886_long_tube")) == 50, "파츠 가격 = 무기가 140 × 0.35 → $50");
-        Check(ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "colt45")) == 18 && ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "m792")) == 180, "탄약 팩 = 기준 무기가 × 0.2 (.45 Colt $18, 7.92 $180)");
+        Check(ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "colt45")) == 12 && ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "m792")) == 180, "탄약 팩 = 기준 무기가 × 0.2 (.45 Colt $12, 7.92 $180)");
 
         // 무기 최종 스탯
         var m1873 = WeaponInfo.Find(table.Weapon, "m1873");
@@ -62,7 +62,7 @@ public static class PocShopVerification
         var parts = new PartInventory(table.Part);
         var a = new WeaponInstance("m1873", 6);
         var b = new WeaponInstance("m1873", 6);
-        var colt = new WeaponInstance("colt1878", 6);
+        var colt = new WeaponInstance("colt1878", 2);
         Check(!parts.Attach("m1873_nickel", a), "보유하지 않은 파츠는 붙일 수 없다");
         var nickel1 = parts.Add("m1873_nickel");
         var nickel2 = parts.Add("m1873_nickel");
@@ -83,8 +83,8 @@ public static class PocShopVerification
         Check(nickel1.AttachedTo == dropped && heavy1.AttachedTo == dropped, "무기 개체에 붙은 파츠는 그 무기를 따라간다(바닥에 놓아도 유지)");
 
         // 아킴보 모델
-        Check(WeaponInfo.CanAkimbo(m1873) && WeaponInfo.CanAkimbo(WeaponInfo.Find(table.Weapon, "colt1878")) && WeaponInfo.CanAkimbo(WeaponInfo.Find(table.Weapon, "p08")),
-            "M1873·Colt 1878·P08은 아킴보 허용");
+        Check(WeaponInfo.CanAkimbo(m1873) && !WeaponInfo.CanAkimbo(WeaponInfo.Find(table.Weapon, "colt1878")) && WeaponInfo.CanAkimbo(WeaponInfo.Find(table.Weapon, "p08")),
+            "M1873·P08은 아킴보 허용, Colt 1878 산탄총은 불가");
         Check(!WeaponInfo.CanAkimbo(win1886) && !WeaponInfo.CanAkimbo(mp18) && !WeaponInfo.CanAkimbo(WeaponInfo.Find(table.Weapon, "m1897")), "소총·기관단총·샷건은 아킴보 불가");
         Check(WeaponInfo.AkimboReloadMultiplier(table.Weapon) > 1f, "아킴보 재장전 배율(provisional) > 1");
         var pair = new WeaponLoadout(2);
@@ -114,9 +114,9 @@ public static class PocShopVerification
         var wallet = new PlayerWallet(100);
         var ammoShop = new AmmoShop(shop, ammo, wallet);
         int reserve = ammo.GetReserve("colt45");
-        Check(ammoShop.TryBuy("colt45") == "" && ammo.GetReserve("colt45") == reserve + 125 && wallet.Balance == 82, "탄약 팩은 125발을 더하고 팩 가격만 낸다");
+        Check(ammoShop.TryBuy("colt45") == "" && ammo.GetReserve("colt45") == reserve + 125 && wallet.Balance == 88, "탄약 팩은 125발을 더하고 팩 가격만 낸다");
         ammo.Add("colt45", 10000);
-        Check(ammoShop.TryBuy("colt45") != "" && wallet.Balance == 82, "최대 예비탄이면 팩을 살 수 없다");
+        Check(ammoShop.TryBuy("colt45") != "" && wallet.Balance == 88, "최대 예비탄이면 팩을 살 수 없다");
 
         // 슬롯 업그레이드 진열
         var perks = new PerkInventory(table.Perk);

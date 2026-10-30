@@ -1002,6 +1002,7 @@ public sealed class GameManager : MonoBehaviour
         }
         string fallbackModel = WeaponInfo.Drop(table)?.fallbackModelId;
         var offHand = loadout.OffHand;
+        weapon.SetHeldModels(heldModels);
         if (heldModels != null) heldModels.ApplyParts(active, offHand);
         if (offHand != null && WeaponInfo.CanAkimbo(entry))
         {

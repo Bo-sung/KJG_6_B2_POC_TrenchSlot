@@ -31,11 +31,11 @@
   ],
   "ammoPack": { "rounds": 125, "priceRatio": 0.2 },
   "ammoPacks": [
-    { "ammoId": "colt45", "referenceWeaponId": "colt1878" },
+    { "ammoId": "colt45", "referenceWeaponId": "m1873" },
     { "ammoId": "wcf4065", "referenceWeaponId": "win1886" },
     { "ammoId": "p9x19", "referenceWeaponId": "mp18" },
     { "ammoId": "b303", "referenceWeaponId": "smle" },
-    { "ammoId": "ga12", "referenceWeaponId": "m1897" },
+    { "ammoId": "ga12", "referenceWeaponId": "colt1878" },
     { "ammoId": "acp45", "referenceWeaponId": "thompson" },
     { "ammoId": "r762x54", "referenceWeaponId": "mosin" },
     { "ammoId": "m792", "referenceWeaponId": "mg42" }

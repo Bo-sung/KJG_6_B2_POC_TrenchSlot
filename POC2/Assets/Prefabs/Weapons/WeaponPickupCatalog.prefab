@@ -59,3 +59,5 @@ MonoBehaviour:
     prefab: {fileID: 6750277262871495955, guid: 8180529eaa235bf4f840da2f83698fc9, type: 3}
   - id: winchester_1886
     prefab: {fileID: 5347209952793652866, guid: 14b517231f5b2934fbda0e8457ea1e11, type: 3}
+  - id: colt_1878_shotgun
+    prefab: {fileID: 2973067415692731127, guid: d640084665e99cd45a21bbc33ac868dc, type: 3}

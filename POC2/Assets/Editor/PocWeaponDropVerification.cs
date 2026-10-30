@@ -206,13 +206,13 @@ public static class PocWeaponDropVerification
         }
         Check(everyModel, "들고 있는 무기 프리팹은 외형마다 모델을 가진다");
         Check(heldComponent != null && heldComponent.HasOffHand("revolver"), "아킴보 권총 외형은 왼손 모델도 가진다");
-        Check(heldComponent != null && heldComponent.HasOffHand("colt_saa") && heldComponent.HasOffHand("colt_1878"),
-            "교체된 두 리볼버도 아킴보 왼손 모델을 가진다");
+        Check(heldComponent != null && heldComponent.HasOffHand("colt_saa") && !heldComponent.HasOffHand("colt_1878_shotgun"),
+            "M1873은 왼손 모델이 있고 Colt 1878 산탄총은 없다");
         var weapons = TableManager.Instance.Weapon;
         Check(WeaponInfo.Find(weapons, "m1873")?.modelId == "colt_saa" &&
-              WeaponInfo.Find(weapons, "colt1878")?.modelId == "colt_1878" &&
+              WeaponInfo.Find(weapons, "colt1878")?.modelId == "colt_1878_shotgun" &&
               WeaponInfo.Find(weapons, "win1886")?.modelId == "winchester_1886",
-            "1887 무기 3종이 각각 실제 총기 모델을 참조한다");
+            "1887 무기 3종이 각각 올바른 무기 종류 외형을 참조한다");
         Check(AssetDatabase.LoadAssetAtPath<InputActionReference>(PocWeaponDropAuthoring.INPUT_REF_PATH) != null, "Pickup 입력 참조 에셋이 있다");
     }
 
@@ -311,7 +311,7 @@ public static class PocWeaponDropVerification
         // 슬롯이 가득 차면 교체할 슬롯이 필요하다. 사용 중 슬롯을 교체하면 새 무기를 즉시 든다.
         int before = gm.Wallet.Balance;
         Check(gm.TryBuyWeapon("colt1878", -1) != "" && gm.Wallet.Balance == before, "슬롯이 가득 차면 교체 슬롯 없이 살 수 없다");
-        Check(gm.TryBuyWeapon("colt1878", 0) == "" && gm.Loadout.ActiveWeaponId == "colt1878" && weapon.Ammo == 6, "사용 중 슬롯 교체 시 새 무기를 즉시 든다");
+        Check(gm.TryBuyWeapon("colt1878", 0) == "" && gm.Loadout.ActiveWeaponId == "colt1878" && weapon.Ammo == 2, "사용 중 슬롯 교체 시 새 무기를 즉시 든다");
         var ground = GroundWeapons();
         Check(ground.Count == 1 && ground[0].WeaponId == "m1873" && ground[0].Ammo == 2 && gm.Parts.AttachedTo("m1873_heavy_barrel") == ground[0].Weapon,
             "교체된 M1873은 장전탄 2발과 파츠를 그대로 지닌 채 바닥에 놓인다");
@@ -330,9 +330,10 @@ public static class PocWeaponDropVerification
 
         // 전환: 진행 중 재장전은 취소되고 장전탄은 무기마다 남는다.
         SetAmmo(weapon, 1);
+        gm.Ammo.Add("ga12", 2);
         weapon.StartReload();
         Check(weapon.IsReloading, "재장전을 시작한다");
-        Check(gm.SelectSlot(1) && !weapon.IsReloading && gm.Loadout.Get(0).Magazine == 1 && weapon.Ammo == 6, "슬롯 전환은 재장전을 취소하고 각 무기 장전탄을 유지한다");
+        Check(gm.SelectSlot(1) && !weapon.IsReloading && gm.Loadout.Get(0).Magazine == 1 && weapon.Ammo == 2, "슬롯 전환은 재장전을 취소하고 각 무기 장전탄을 유지한다");
         Check(gm.SelectSlot(0) && weapon.Ammo == 1, "다시 전환하면 이전 무기 장전탄 그대로다");
 
         // 가득 찬 슬롯에서 줍기: 사용 중 무기와 교환하고, 주운 무기는 장전탄·파츠를 유지한다.

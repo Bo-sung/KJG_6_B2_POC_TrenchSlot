@@ -78,7 +78,15 @@ public sealed class PlayerWeapon : MonoBehaviour
     private InputAction aimInput;
     private float normalFieldOfView;
     private GameConfigData aimConfig;
+    private WeaponHeldModels heldModels;
+    private float aimAmount;
     public bool IsAiming { get; private set; }
+
+    public void SetHeldModels(WeaponHeldModels _models)
+    {
+        if (heldModels != _models) heldModels?.SetAim(aimCamera, current, 0f);
+        heldModels = _models;
+    }
 
     public string AmmoId { get; private set; }
     public int ReserveAmmo => inventory != null ? inventory.GetReserve(AmmoId) : 0;
@@ -408,15 +416,17 @@ public sealed class PlayerWeapon : MonoBehaviour
         IsAiming = _pressed && !akimbo && InputGate.PlayerEnabled && (health == null || health.IsAlive) && aimCamera != null;
         if (aimCamera == null || normalFieldOfView <= 0f) return;
         float ratio = GameConfigInfo.AimFovRatio(aimConfig);
-        float target = IsAiming ? normalFieldOfView * ratio : normalFieldOfView;
-        float speed = normalFieldOfView * (1f - ratio) / GameConfigInfo.AimTransitionSeconds(aimConfig);
-        aimCamera.fieldOfView = Mathf.MoveTowards(aimCamera.fieldOfView, target, speed * Mathf.Max(0f, _deltaTime));
+        aimAmount = Mathf.MoveTowards(aimAmount, IsAiming ? 1f : 0f, Mathf.Max(0f, _deltaTime) / GameConfigInfo.AimTransitionSeconds(aimConfig));
+        aimCamera.fieldOfView = Mathf.Lerp(normalFieldOfView, normalFieldOfView * ratio, aimAmount);
+        heldModels?.SetAim(aimCamera, current, aimAmount);
     }
 
     private void ResetAim()
     {
         IsAiming = false;
+        aimAmount = 0f;
         if (aimCamera != null && normalFieldOfView > 0f) aimCamera.fieldOfView = normalFieldOfView;
+        heldModels?.SetAim(aimCamera, current, 0f);
     }
 
     // 기존 재장전 시간은 빈 탄창 전체 기준. 단발 삽입 시 한 발당 시간으로 나눈다.
@@ -607,6 +617,10 @@ public sealed class PlayerWeapon : MonoBehaviour
         HandFired?.Invoke(hand);
         SoundPlayer.Play(SfxType.Shot);
         Vector3 muzzle = aimCamera.transform.TransformPoint(hand == 0 ? MUZZLE_OFFSET : OFF_HAND_MUZZLE_OFFSET);
+        if (hand == 0 && aimAmount > 0f && heldModels != null && heldModels.TryGetAimFront(current, out Vector3 sight))
+        {
+            muzzle = Vector3.Lerp(muzzle, sight + aimCamera.transform.forward * 0.03f, aimAmount);
+        }
         EffectSpawner.Spawn(EffectSpawner.MUZZLE_FLASH, muzzle, aimCamera.transform.rotation);
         // 카메라→총구 사이가 벽·적에 가리면 카메라 위치에서 쏴서, 벽에 붙어 쏘거나 근접한 적을 쏠 때 관통·누락이 없게 한다.
         Vector3 origin = MuzzleBlocked(muzzle) ? aimCamera.transform.position : muzzle;

@@ -1,0 +1,16 @@
+{
+  "note": "POC model-space iron sight alignment in metres; placeholder models have approximate barrel-top sights.",
+  "profiles": [
+    {"modelId":"colt_saa", "rear":{"x":0,"y":-0.051,"z":-0.03}, "front":{"x":0,"y":-0.032,"z":0.214}, "eyeDistance":0.25,
+     "variants":[{"partId":"m1873_heavy_barrel","front":{"x":0,"y":-0.0292,"z":0.211}}]},
+    {"modelId":"colt_1878", "rear":{"x":0,"y":-0.0607,"z":-0.02}, "front":{"x":0,"y":-0.05406,"z":0.20644}, "eyeDistance":0.20,
+     "variants":[{"partId":"colt1878_short_barrel","front":{"x":0,"y":-0.05406,"z":0.13659}}]},
+    {"modelId":"winchester_1886", "rear":{"x":0,"y":-0.066,"z":0.228}, "front":{"x":0,"y":-0.0725,"z":0.731}, "eyeDistance":0.38,
+     "variants":[{"partId":"win1886_long_barrel","front":{"x":0,"y":-0.073,"z":0.8326}}]},
+    {"modelId":"revolver", "rear":{"x":0,"y":0.11,"z":-0.12}, "front":{"x":0,"y":0.085,"z":0.37}, "eyeDistance":0.22},
+    {"modelId":"bolt", "rear":{"x":0,"y":0.13,"z":-0.02}, "front":{"x":0,"y":0.13,"z":0.22}, "eyeDistance":0.25},
+    {"modelId":"smg", "rear":{"x":0,"y":0.09,"z":-0.16}, "front":{"x":0,"y":0.09,"z":0.35}, "eyeDistance":0.25},
+    {"modelId":"shotgun", "rear":{"x":0,"y":0.085,"z":-0.12}, "front":{"x":0,"y":0.085,"z":0.55}, "eyeDistance":0.25}
+    ,{"modelId":"colt_1878_shotgun", "rear":{"x":0,"y":0.085,"z":-0.14}, "front":{"x":0,"y":0.085,"z":0.56}, "eyeDistance":0.25}
+  ]
+}

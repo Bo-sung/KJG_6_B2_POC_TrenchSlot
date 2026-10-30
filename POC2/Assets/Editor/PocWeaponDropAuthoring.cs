@@ -26,7 +26,7 @@ public static class PocWeaponDropAuthoring
     private const string OLD_REVOLVER_NAME = "Revolver";
 
     // 외형 id(WeaponData.modelId). 같은 계열 총기는 외형을 공유한다.
-    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun", "colt_saa", "colt_1878", "winchester_1886" };
+    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun", "colt_saa", "colt_1878", "winchester_1886", "colt_1878_shotgun" };
     private static readonly string[] WEAPON_IDS = MODEL_IDS;
 
     private static Material metal;
@@ -145,6 +145,7 @@ public static class PocWeaponDropAuthoring
 
         var box = root.AddComponent<BoxCollider>();
         box.center = new Vector3(0f, 0.12f, 0f);
+        if (_id == "colt_1878_shotgun") box.center = new Vector3(0f, 0.12f, 0.6f);
         box.size = BoundsSize(_id);
         string path = string.Format(PICKUP_PREFAB_FORMAT, _id);
         PrefabUtility.SaveAsPrefabAsset(root, path);
@@ -268,10 +269,84 @@ public static class PocWeaponDropAuthoring
                 Part(PrimitiveType.Cube, "Pump", _parent, new Vector3(0f, 0.01f, 0.25f), new Vector3(0.07f, 0.07f, 0.16f), wood);
                 Part(PrimitiveType.Cube, "Stock", _parent, new Vector3(0f, -0.02f, -0.32f), new Vector3(0.07f, 0.12f, 0.32f), wood);
                 break;
+            case "colt_1878_shotgun":
+                BuildImportedModel("colt_1878_shotgun_reference_sightfix", _parent, 0.21f);
+                break;
             default:
                 Debug.LogError($"PocWeaponDropAuthoring: 알 수 없는 무기 {_id}");
                 break;
         }
+    }
+
+    // 기존 프리팹의 다른 무기와 씬 참조는 그대로 두고 쌍열 산탄총만 추가한다.
+    [MenuItem("POC/Add Colt 1878 Shotgun")]
+    public static void AddColtShotgun()
+    {
+        const string id = "colt_1878_shotgun";
+        LoadMaterials();
+        var pickup = BuildPickupPrefab(id).GetComponent<WeaponPickup>();
+        var heldRoot = PrefabUtility.LoadPrefabContents(HELD_PREFAB_PATH);
+        try
+        {
+            var held = heldRoot.GetComponent<WeaponHeldModels>();
+            var model = heldRoot.transform.Find(id);
+            if (model == null)
+            {
+                model = new GameObject(id).transform;
+                model.SetParent(heldRoot.transform, false);
+                BuildModel(id, model);
+                model.gameObject.SetActive(false);
+            }
+            else if (model.Find("BarrelLeft") != null && model.Find("BarrelRight") != null)
+            {
+                // 기존에 생성한 임시 쌍열 메시만 교체한다.
+                foreach (string name in new[] { "BarrelLeft", "BarrelRight", "Receiver", "ForeEnd", "Stock" })
+                {
+                    var child = model.Find(name);
+                    if (child != null) Object.DestroyImmediate(child.gameObject);
+                }
+                BuildModel(id, model);
+            }
+            var so = new SerializedObject(held);
+            var entries = so.FindProperty("entries");
+            bool found = false;
+            for (int i = 0; i < entries.arraySize; i++)
+            {
+                var element = entries.GetArrayElementAtIndex(i);
+                if (element.FindPropertyRelative("id").stringValue != id) continue;
+                element.FindPropertyRelative("model").objectReferenceValue = model.gameObject;
+                found = true;
+                break;
+            }
+            if (!found)
+            {
+                int index = entries.arraySize++;
+                var element = entries.GetArrayElementAtIndex(index);
+                element.FindPropertyRelative("id").stringValue = id;
+                element.FindPropertyRelative("model").objectReferenceValue = model.gameObject;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(heldRoot, HELD_PREFAB_PATH);
+        }
+        finally { PrefabUtility.UnloadPrefabContents(heldRoot); }
+
+        var catalogRoot = PrefabUtility.LoadPrefabContents(CATALOG_PREFAB_PATH);
+        try
+        {
+            var so = new SerializedObject(catalogRoot.GetComponent<WeaponPickupCatalog>());
+            var entries = so.FindProperty("entries");
+            int index = -1;
+            for (int i = 0; i < entries.arraySize; i++)
+                if (entries.GetArrayElementAtIndex(i).FindPropertyRelative("id").stringValue == id) { index = i; break; }
+            if (index < 0) index = entries.arraySize++;
+            var element = entries.GetArrayElementAtIndex(index);
+            element.FindPropertyRelative("id").stringValue = id;
+            element.FindPropertyRelative("prefab").objectReferenceValue = pickup;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(catalogRoot, CATALOG_PREFAB_PATH);
+        }
+        finally { PrefabUtility.UnloadPrefabContents(catalogRoot); }
+        AssetDatabase.SaveAssets();
     }
 
     // AssetFactory FBX는 총구가 -X 방향이므로 게임의 +Z 방향으로 회전한다.
@@ -317,6 +392,8 @@ public static class PocWeaponDropAuthoring
                 return new Vector3(0.14f, 0.2f, 0.5f);
             case "shotgun":
                 return new Vector3(0.14f, 0.2f, 0.95f);
+            case "colt_1878_shotgun":
+                return new Vector3(0.14f, 0.23f, 1.25f);
             default:
                 return new Vector3(0.14f, 0.2f, 0.56f);
         }
