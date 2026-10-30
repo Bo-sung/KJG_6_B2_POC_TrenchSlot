@@ -198,19 +198,22 @@ public static class PocAkimboVerification
         Fire();
         Check(first.Magazine == m1873.magazineSize - 2 && second.Magazine == 0, "한쪽이 비면 남은 손만 쏜다(간격 지킴)");
 
-        // 7) 양손 재장전: 시간 = 긴 쪽 × 아킴보 배율, 예비탄 부족 시 적은 손 우선.
+        // 7) 양손 리볼버는 더 비어 있는 손부터 한 발씩 장전한다.
         var ammo = game.Ammo;
         ammo.Consume(m1873.ammoId, ammo.GetReserve(m1873.ammoId));
         ammo.Add(m1873.ammoId, 3);
         first.Magazine = 4;
         second.Magazine = 1;
         weapon.StartReload();
-        float expected = Mathf.Max(weapon.HandSettings(0).reloadSeconds, weapon.HandSettings(1).reloadSeconds) * WeaponInfo.AkimboReloadMultiplier(tables.Weapon);
+        float expected = Mathf.Max(weapon.HandSettings(0).reloadSeconds, weapon.HandSettings(1).reloadSeconds) * WeaponInfo.AkimboReloadMultiplier(tables.Weapon) / weapon.HandMagazineSize(0);
         Check(weapon.IsReloading, "아킴보 재장전 시작");
         float end = Time.time + expected;
         yield return WaitUntilTime(end - 0.1f);
-        Check(weapon.IsReloading, $"배율 적용 재장전 시간({expected:0.##}초) 전에는 진행 중");
+        Check(weapon.IsReloading && second.Magazine == 1, $"첫 탄 장전 시간({expected:0.##}초) 전에는 탄약을 소비하지 않음");
         yield return WaitUntilTime(end + 0.1f);
+        Check(weapon.IsReloading && second.Magazine == 2 && ammo.GetReserve(m1873.ammoId) == 2,
+            "첫 탄 한 발만 더 비어 있는 손에 장전");
+        yield return WaitUntilTime(end + expected * 2f + 0.3f);
         Check(!weapon.IsReloading && second.Magazine == 4 && first.Magazine == 4 && ammo.GetReserve(m1873.ammoId) == 0,
             "예비탄 3발은 장전탄이 적은 손 1부터 채움");
 

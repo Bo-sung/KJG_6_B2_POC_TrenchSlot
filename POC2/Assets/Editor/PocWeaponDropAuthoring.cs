@@ -26,7 +26,7 @@ public static class PocWeaponDropAuthoring
     private const string OLD_REVOLVER_NAME = "Revolver";
 
     // 외형 id(WeaponData.modelId). 같은 계열 총기는 외형을 공유한다.
-    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun" };
+    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun", "colt_saa", "colt_1878", "winchester_1886" };
     private static readonly string[] WEAPON_IDS = MODEL_IDS;
 
     private static Material metal;
@@ -235,6 +235,15 @@ public static class PocWeaponDropAuthoring
     {
         switch (_id)
         {
+            case "colt_saa":
+                PocWeaponPartsAuthoring.Build(_id, _parent);
+                break;
+            case "colt_1878":
+                PocWeaponPartsAuthoring.Build(_id, _parent);
+                break;
+            case "winchester_1886":
+                PocWeaponPartsAuthoring.Build(_id, _parent);
+                break;
             case "revolver":
                 Part(PrimitiveType.Cube, "Frame", _parent, new Vector3(0f, 0.05f, 0f), new Vector3(0.08f, 0.12f, 0.42f), metal);
                 Part(PrimitiveType.Cylinder, "Drum", _parent, new Vector3(0f, 0.05f, -0.02f), new Vector3(0.11f, 0.04f, 0.11f), metal, new Vector3(90f, 0f, 0f));
@@ -265,6 +274,22 @@ public static class PocWeaponDropAuthoring
         }
     }
 
+    // AssetFactory FBX는 총구가 -X 방향이므로 게임의 +Z 방향으로 회전한다.
+    // 세로 중심을 기존 외형과 맞추고, FBX 자체는 수정하지 않은 채 중첩 프리팹으로 사용한다.
+    private static void BuildImportedModel(string _name, Transform _parent, float _verticalCenter)
+    {
+        string path = $"Assets/Models/AssetFactory/{_name}.fbx";
+        var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (asset == null)
+        {
+            throw new System.InvalidOperationException($"무기 모델을 찾지 못했습니다: {path}");
+        }
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(asset);
+        instance.transform.SetParent(_parent, false);
+        instance.transform.localPosition = new Vector3(0f, -_verticalCenter, 0f);
+        instance.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+    }
+
     private static void Part(PrimitiveType _type, string _name, Transform _parent, Vector3 _position, Vector3 _scale, Material _material, Vector3 _euler = default)
     {
         var go = GameObject.CreatePrimitive(_type);
@@ -281,6 +306,11 @@ public static class PocWeaponDropAuthoring
     {
         switch (_id)
         {
+            case "colt_saa":
+            case "colt_1878":
+                return new Vector3(0.14f, 0.2f, 0.4f);
+            case "winchester_1886":
+                return new Vector3(0.14f, 0.23f, 1.2f);
             case "bolt":
                 return new Vector3(0.14f, 0.2f, 1f);
             case "smg":

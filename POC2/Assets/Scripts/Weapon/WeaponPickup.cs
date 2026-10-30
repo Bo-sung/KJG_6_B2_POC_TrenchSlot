@@ -25,6 +25,7 @@ public sealed class WeaponPickup : MonoBehaviour
         weapon = _weapon;
         displayName = _displayName ?? "";
         consumed = false;
+        foreach (var visual in GetComponentsInChildren<WeaponPartVisual>(true)) visual.Apply(_weapon);
     }
 
     // 줍기 성공 시 호출. 소비 표시·콜라이더 끄기·비활성화를 즉시 해서 같은 프레임의 조준·재줍기에 다시 걸리지 않게 하고,

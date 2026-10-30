@@ -179,11 +179,16 @@ public static class PocAssetBuilder
         // WWII 소총: 탄창 상자와 조준경이 붙은 반자동 소총.
         BuildGunModel(mount.transform, "wwii_rifle", 0.95f, true, wood, metal);
 
+        var meleeWeapon = PocEnemyWeaponAuthoring.EnsureMeleeWeapon(root);
+
         var so = new SerializedObject(enemy);
         so.FindProperty("bodyRenderer").objectReferenceValue = body.GetComponent<Renderer>();
         so.FindProperty("weaponMount").objectReferenceValue = mount.transform;
+        so.FindProperty("meleeWeapon").objectReferenceValue = meleeWeapon;
         so.ApplyModifiedPropertiesWithoutUndo();
         SavePrefab(root, $"{GAMEPLAY_PREFAB_DIR}/Enemy.prefab");
+        // 전체 프리팹 재생성 시에도 적이 플레이어 무기 외형을 공유한다.
+        PocEnemyWeaponAuthoring.Apply();
     }
 
     // 총 모델 하나: 손(부모 원점) 기준 +Z 방향으로 총신이 뻗는다. 적은 플레이어를 향해 회전하므로 +Z가 정면이다.

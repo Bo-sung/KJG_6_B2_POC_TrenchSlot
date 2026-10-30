@@ -83,6 +83,7 @@ public static class WeaponInfo
         settings.range = _entry.range;
         settings.shotsPerSecond = _entry.shotsPerSecond * fireRate;
         settings.reloadSeconds = _entry.reloadSeconds * reload * Mathf.Max(0f, _reloadMultiplier);
+        settings.reloadPerRound = _entry.reloadPerRound;
         settings.automatic = _entry.automatic;
         settings.pellets = Mathf.Max(1, _entry.pellets);
         settings.spreadDegrees = Mathf.Max(0f, _entry.spreadDegrees);

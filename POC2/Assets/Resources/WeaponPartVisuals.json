@@ -1,0 +1,14 @@
+{
+  "weapons": [
+    {"modelId":"colt_saa","weaponId":"m1873","verticalCenter":0.07,"nickelPart":"m1873_nickel","nickelMaterials":["saa_blued","saa_frame"],"nickelColors":[{"r":0.5,"g":0.5,"b":0.48,"a":1},{"r":0.42,"g":0.42,"b":0.4,"a":1}],"slots":[
+      {"anchor":"anchor_barrel","standard":"colt_saa_barrel_standard","replacement":"colt_saa_barrel_heavy","partId":"m1873_heavy_barrel"},
+      {"anchor":"anchor_cylinder","standard":"colt_saa_cylinder_standard","replacement":"colt_saa_cylinder_quick","partId":"m1873_fast_cylinder"}]},
+    {"modelId":"winchester_1886","weaponId":"win1886","verticalCenter":0.09,"slots":[
+      {"anchor":"anchor_barrel","standard":"winchester_1886_barrel_standard","replacement":"winchester_1886_barrel_extended","partId":"win1886_long_barrel"},
+      {"anchor":"anchor_magazine","standard":"winchester_1886_magazine_standard","replacement":"winchester_1886_magazine_extended","partId":"win1886_long_tube"},
+      {"anchor":"anchor_lever","standard":"winchester_1886_lever_standard","replacement":"winchester_1886_lever_large_loop","partId":"win1886_lever_grip"}]},
+    {"modelId":"colt_1878","weaponId":"colt1878","verticalCenter":0.07,"nickelPart":"colt1878_nickel","nickelMaterials":["c78_nickel_worn","c78_nickel_toned"],"nickelColors":[{"r":0.5,"g":0.5,"b":0.48,"a":1},{"r":0.5,"g":0.5,"b":0.48,"a":1}],"slots":[
+      {"anchor":"anchor_barrel","standard":"colt_1878_barrel_standard","replacement":"colt_1878_barrel_short","partId":"colt1878_short_barrel"},
+      {"anchor":"anchor_grip","standard":"colt_1878_grip_standard","replacement":"colt_1878_grip_ivory","partId":"colt1878_ivory_grip"}]}
+  ]
+}

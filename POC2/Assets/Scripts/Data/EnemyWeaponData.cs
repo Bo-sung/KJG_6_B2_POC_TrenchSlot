@@ -8,6 +8,8 @@ public sealed class EnemyWeaponData
     public sealed class Entry
     {
         public string id;
+        // 동일한 총기 종류를 가리키는 플레이어 무기 ID. 적의 전투 밸런스는 아래 별도 수치를 사용한다.
+        public string playerWeaponId;
         public string dropAmmoId;
         public string name;
         // 시대 표기(MUSKET·WWI·WWII). 표시·확인용이며 판정에는 쓰지 않는다.

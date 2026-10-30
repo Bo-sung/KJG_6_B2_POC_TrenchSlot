@@ -17,6 +17,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         [Min(0f)] public float range;
         [Min(0f)] public float shotsPerSecond;
         [Min(0f)] public float reloadSeconds;
+        public bool reloadPerRound;
         public bool automatic;
         // 방아쇠 1회당 발사체 수와 산포 반각(도).
         [Min(1)] public int pellets;
@@ -349,7 +350,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         }
 
         isReloading = true;
-        reloadDuration = ReloadSeconds();
+        reloadDuration = ReloadStepSeconds();
         reloadEndTime = Time.time + reloadDuration;
         if (reloadDuration <= 0f)
         {
@@ -385,11 +386,58 @@ public sealed class PlayerWeapon : MonoBehaviour
         return seconds;
     }
 
+    // 기존 재장전 시간은 빈 탄창 전체 기준. 단발 삽입 시 한 발당 시간으로 나눈다.
+    private float ReloadStepSeconds()
+    {
+        float total = ReloadSeconds();
+        return settings.reloadPerRound ? total / Mathf.Max(1, settings.magazineSize) : total;
+    }
+
     // 예비탄이 모자라면 장전탄이 적은 손부터 채운다(같으면 손 0). provisional 규칙이다.
     private void CompleteReload()
     {
         if (!isReloading)
         {
+            return;
+        }
+        if (settings.reloadPerRound)
+        {
+            if (reloadDuration <= 0f && inventory != null)
+            {
+                FillHandFromReserve(0);
+                if (akimbo)
+                {
+                    FillHandFromReserve(1);
+                }
+                isReloading = false;
+                AmmoChanged?.Invoke(Ammo, MagazineSize);
+                return;
+            }
+            int hand = akimbo && offHand.Magazine < MainAmmo ? 1 : 0;
+            if (HandAmmo(hand) >= HandMagazineSize(hand) && akimbo)
+            {
+                hand = 1 - hand;
+            }
+            if (inventory != null && HandAmmo(hand) < HandMagazineSize(hand) && inventory.Consume(AmmoId, 1) == 1)
+            {
+                if (hand == 0)
+                {
+                    MainAmmo++;
+                }
+                else
+                {
+                    offHand.Magazine++;
+                }
+            }
+            if (NeedsReload() && ReserveAmmo > 0 && reloadDuration > 0f)
+            {
+                reloadEndTime = Time.time + reloadDuration;
+            }
+            else
+            {
+                isReloading = false;
+            }
+            AmmoChanged?.Invoke(Ammo, MagazineSize);
             return;
         }
         isReloading = false;
@@ -506,6 +554,11 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     private void TryFire()
     {
+        // 한 발씩 장전하는 무기는 이미 들어간 탄을 보존하고 사격으로 장전을 중단한다.
+        if (isReloading && settings.reloadPerRound && PickHand(Time.time) >= 0)
+        {
+            CancelReload();
+        }
         if (isReloading || aimCamera == null)
         {
             return;

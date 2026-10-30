@@ -24,6 +24,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     [SerializeField] private Renderer bodyRenderer;
     // 무기 모델 부모. 자식 이름이 무기 id와 같은 모델만 켜진다. 모델은 프리팹에 미리 둔다.
     [SerializeField] private Transform weaponMount;
+    // 근접 적만 드는 각목. 판정은 기존 근접 공격 로직을 사용한다.
+    [SerializeField] private GameObject meleeWeapon;
 
     private static readonly int BASE_COLOR_ID = Shader.PropertyToID(BASE_COLOR_PROPERTY);
 
@@ -113,6 +115,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     public int Reward => stats != null ? stats.reward : 0;
     // 들고 있는 무기 id. 근접 적은 항상 빈 문자열이다.
     public string WeaponId => weapon != null ? weapon.id : "";
+    public string PlayerWeaponId => weapon != null ? weapon.playerWeaponId : "";
     public string DropAmmoId => weapon != null ? weapon.dropAmmoId : "";
 
     // 전투 정보 조회 프로퍼티
@@ -165,6 +168,10 @@ public sealed class Enemy : MonoBehaviour, IDamageable
 
         ApplyTint(_tint);
         ShowWeapon(armed ? weapon.id : "");
+        if (meleeWeapon != null)
+        {
+            meleeWeapon.SetActive(stats != null && !stats.ranged);
+        }
     }
 
     private void ConfigureCombatStats(EnemyData.Entry _stats)

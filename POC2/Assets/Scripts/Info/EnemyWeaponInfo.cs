@@ -44,6 +44,26 @@ public static class EnemyWeaponInfo
         }
     }
 
+    public static void ValidatePlayerWeapons(EnemyWeaponData _table, WeaponData _weapons)
+    {
+        if (_table == null || _table.weapons == null)
+        {
+            return;
+        }
+        foreach (var enemyWeapon in _table.weapons)
+        {
+            if (enemyWeapon == null)
+            {
+                continue;
+            }
+            var playerWeapon = WeaponInfo.Find(_weapons, enemyWeapon.playerWeaponId);
+            if (playerWeapon == null || playerWeapon.ammoId != enemyWeapon.dropAmmoId)
+            {
+                Debug.LogError($"적 무기 {enemyWeapon.id}의 플레이어 무기 또는 탄종 참조가 올바르지 않습니다.");
+            }
+        }
+    }
+
     public static void Validate(EnemyWeaponData _table)
     {
         if (_table == null || _table.weapons == null || _table.weapons.Length == 0)

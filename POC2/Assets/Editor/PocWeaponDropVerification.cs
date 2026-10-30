@@ -206,6 +206,13 @@ public static class PocWeaponDropVerification
         }
         Check(everyModel, "들고 있는 무기 프리팹은 외형마다 모델을 가진다");
         Check(heldComponent != null && heldComponent.HasOffHand("revolver"), "아킴보 권총 외형은 왼손 모델도 가진다");
+        Check(heldComponent != null && heldComponent.HasOffHand("colt_saa") && heldComponent.HasOffHand("colt_1878"),
+            "교체된 두 리볼버도 아킴보 왼손 모델을 가진다");
+        var weapons = TableManager.Instance.Weapon;
+        Check(WeaponInfo.Find(weapons, "m1873")?.modelId == "colt_saa" &&
+              WeaponInfo.Find(weapons, "colt1878")?.modelId == "colt_1878" &&
+              WeaponInfo.Find(weapons, "win1886")?.modelId == "winchester_1886",
+            "1887 무기 3종이 각각 실제 총기 모델을 참조한다");
         Check(AssetDatabase.LoadAssetAtPath<InputActionReference>(PocWeaponDropAuthoring.INPUT_REF_PATH) != null, "Pickup 입력 참조 에셋이 있다");
     }
 

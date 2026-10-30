@@ -49,6 +49,7 @@ public sealed class TableManager
         EnemyWeapon = Load<EnemyWeaponData>(nameof(EnemyWeaponData));
         EnemyWeaponInfo.Validate(EnemyWeapon);
         EnemyWeaponInfo.ValidateAmmo(EnemyWeapon, Ammo);
+        EnemyWeaponInfo.ValidatePlayerWeapons(EnemyWeapon, Weapon);
 
         EnemyAi = Load<EnemyAiData>(nameof(EnemyAiData));
         EnemyAiInfo.Validate(EnemyAi);

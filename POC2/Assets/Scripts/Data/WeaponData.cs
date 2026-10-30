@@ -20,6 +20,8 @@ public sealed class WeaponData
         public float range;
         public float shotsPerSecond;
         public float reloadSeconds;
+        // 탄을 개별 삽입하는 무기는 한 발씩 예비탄을 소비한다.
+        public bool reloadPerRound;
         public bool automatic;
         // 방아쇠 1회당 발사체 수(산탄 수)와 산포 반각(도). 단발 무기는 1과 0이다.
         public int pellets;

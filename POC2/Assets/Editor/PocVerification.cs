@@ -213,6 +213,11 @@ public static class PocVerification
         var meleeRusher = UnityEngine.Object.Instantiate(enemyPrefab).GetComponent<Enemy>();
         meleeRusher.Configure(rusherStats, heavyWeapon, 1f, Color.gray, null);
         Check(meleeRusher.WeaponId == "" && ActiveGunModel(meleeRusher.transform.Find("WeaponMount")) == "", "melee rusher ignores a weapon even when one is passed");
+        var stick = meleeRusher.transform.Find("MeleeWeapon");
+        var rangedStick = armedRifle.transform.Find("MeleeWeapon");
+        Check(stick != null && stick.gameObject.activeSelf && stick.GetComponentInChildren<Collider>(true) == null,
+            "melee rusher holds a visible wooden club without an extra collider");
+        Check(rangedStick != null && !rangedStick.gameObject.activeSelf, "ranged enemies do not show the club");
 
         armedRifle.TakeDamage(1f);
         Check(armedRifle.IsFlashing && !armedRifle.IsDead, "non-lethal hit starts the hit flash");

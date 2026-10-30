@@ -19,6 +19,21 @@ public sealed class WeaponHeldModels : MonoBehaviour
 
     public bool HasOffHand(string _id) => Has(offHandEntries, _id);
 
+    public void ApplyParts(WeaponInstance _main, WeaponInstance _offHand)
+    {
+        ApplyParts(entries, _main);
+        ApplyParts(offHandEntries, _offHand);
+    }
+
+    private static void ApplyParts(Entry[] _entries, WeaponInstance _weapon)
+    {
+        foreach (var entry in _entries)
+        {
+            if (entry.model == null) continue;
+            foreach (var visual in entry.model.GetComponentsInChildren<WeaponPartVisual>(true)) visual.Apply(_weapon);
+        }
+    }
+
     // 외형 id 모델이 없으면 대체 외형을 켠다. 왼손 외형은 끈다.
     public void Show(string _id, string _fallbackId = null)
     {

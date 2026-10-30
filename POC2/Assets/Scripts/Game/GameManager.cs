@@ -986,6 +986,7 @@ public sealed class GameManager : MonoBehaviour
             weapon.UpdateSettings(_weapon, settings);
         }
         loadout.NotifyChanged();
+        if (heldModels != null) heldModels.ApplyParts(loadout.Active, loadout.OffHand);
     }
 
     // 사용 중인 무기를 손에 든다. 아킴보면 보조 슬롯 무기를 왼손에 함께 든다. 외형·이동속도도 함께 맞춘다.
@@ -1001,6 +1002,7 @@ public sealed class GameManager : MonoBehaviour
         }
         string fallbackModel = WeaponInfo.Drop(table)?.fallbackModelId;
         var offHand = loadout.OffHand;
+        if (heldModels != null) heldModels.ApplyParts(active, offHand);
         if (offHand != null && WeaponInfo.CanAkimbo(entry))
         {
             weapon.ConfigureAkimbo(active, ResolveSettings(active), offHand, ResolveSettings(offHand), ammo, entry.ammoId, WeaponInfo.AkimboReloadMultiplier(table));
