@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "captureUnityLogs": true,
+  "flushIntervalSeconds": 5,
+  "logShotEvents": true,
+  "logHitEvents": true,
+  "uploadEnabled": false,
+  "developmentServerUrl": "",
+  "releaseServerUrl": "",
+  "apiKey": "",
+  "uploadIntervalSeconds": 5,
+  "requestTimeoutSeconds": 5,
+  "retryPendingOnStartup": true
+}

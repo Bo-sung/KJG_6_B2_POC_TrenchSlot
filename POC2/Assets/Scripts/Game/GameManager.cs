@@ -159,6 +159,7 @@ public sealed class GameManager : MonoBehaviour
 
     private void Start()
     {
+        GameTelemetry.RunStarted(wallet.Balance, MaxHealth, loadout.Active != null ? loadout.Active.WeaponId : "");
         StartCoroutine(StartFirstWaveNextFrame());
     }
 
@@ -171,6 +172,7 @@ public sealed class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        GameTelemetry.EndRun(GameTelemetry.END_SCENE_UNLOADED);
         ClearAmmoDrops();
         if (playerHealth != null)
         {
@@ -233,6 +235,7 @@ public sealed class GameManager : MonoBehaviour
         killsThisWave = 0;
         SetPhase(GamePhase.Wave);
         waves.Begin(currentWave, TableManager.Instance.Enemy, TableManager.Instance.EnemyWeapon, playerHealth);
+        GameTelemetry.WaveStarted(currentWave, wallet.Balance, CurrentHealth);
         WaveStarted?.Invoke(currentWave);
         WaveTimeChanged?.Invoke(waveTimeLeft, currentWave.durationSeconds);
         KillsChanged?.Invoke(killsThisWave);
@@ -258,9 +261,11 @@ public sealed class GameManager : MonoBehaviour
         wallet.Add(WaveBonusPaid);
         // 진열된 슬롯 업그레이드를 전부 샀다면 새로 추첨한다. 일부만 샀으면 유지한다.
         slotOffers.OnWaveEnded();
+        GameTelemetry.WaveCompleted(WaveHealthRestored, WaveBonusPaid, wallet.Balance, playerHealth.CurrentHealth, killsThisWave);
         WaveEnded?.Invoke(currentWave.wave);
         intermissionLeft = GameConfigInfo.IntermissionSeconds(config);
         SetPhase(GamePhase.Shop);
+        GameTelemetry.IntermissionStarted(intermissionLeft, wallet.Balance);
         IntermissionChanged?.Invoke(intermissionLeft);
     }
 
@@ -284,6 +289,7 @@ public sealed class GameManager : MonoBehaviour
         wallet.Add(_enemy.Reward);
         killsThisWave++;
         totalKills++;
+        GameTelemetry.EnemyKilled(_enemy, killsThisWave, totalKills, wallet.Balance);
         KillsChanged?.Invoke(killsThisWave);
     }
 
@@ -353,6 +359,7 @@ public sealed class GameManager : MonoBehaviour
         {
             return;
         }
+        GameTelemetry.EnemiesCleared(waveTimeLeft, killsThisWave);
         EnemiesCleared?.Invoke(waveTimeLeft);
     }
 
@@ -365,6 +372,7 @@ public sealed class GameManager : MonoBehaviour
         waves.Stop();
         ClearGroundWeapons();
         SetPhase(GamePhase.GameOver);
+        GameTelemetry.GameOver(currentWave.wave, totalKills, wallet.Balance);
         GameOver?.Invoke(currentWave.wave, totalKills);
     }
 
@@ -454,6 +462,14 @@ public sealed class GameManager : MonoBehaviour
     // 돈을 쓰기 전에 자리·프리팹을 모두 확인하므로, 실패하면 소지금과 슬롯이 그대로 남는다.
     public string TryBuyWeapon(string _weaponId, int _slot)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyWeapon(_weaponId, _slot);
+        GameTelemetry.ShopPurchase("Weapon", _weaponId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyWeapon(string _weaponId, int _slot)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -510,8 +526,11 @@ public sealed class GameManager : MonoBehaviour
         if (outgoing != null)
         {
             SpawnGroundWeapon(outgoing, spot);
+            GameTelemetry.WeaponDropped(outgoing.WeaponId, outgoing.Magazine, "Bought");
         }
-        loadout.Put(slot, NewWeapon(_weaponId));
+        WeaponInstance bought = NewWeapon(_weaponId);
+        loadout.Put(slot, bought);
+        GameTelemetry.WeaponAcquired("WeaponBought", _weaponId, slot, outgoing != null ? outgoing.WeaponId : "", bought.Magazine);
         if (replacingHeld)
         {
             ApplyActiveWeapon();
@@ -523,6 +542,14 @@ public sealed class GameManager : MonoBehaviour
     // 같은 종류 휴대 무기 중 그 칸이 빈 무기(사용 중 → 아킴보 왼손 → 나머지 순)에 바로 붙이고,
     // 빈 칸이 없으면 이 파츠가 없는 무기의 칸을 바꿔 끼운다(원래 파츠는 보관). 붙일 곳이 없거나 장전탄이 넘치면 보관한다.
     public string TryBuyPart(string _partId)
+    {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyPart(_partId);
+        GameTelemetry.ShopPurchase("Part", _partId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyPart(string _partId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -765,6 +792,14 @@ public sealed class GameManager : MonoBehaviour
 
     public string TryBuyStat(string _statId)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyStat(_statId);
+        GameTelemetry.ShopPurchase("Stat", _statId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyStat(string _statId)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -787,6 +822,14 @@ public sealed class GameManager : MonoBehaviour
 
     public string TryBuyAmmo(string _ammoId)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyAmmo(_ammoId);
+        GameTelemetry.ShopPurchase("Ammo", _ammoId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyAmmo(string _ammoId)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -800,6 +843,14 @@ public sealed class GameManager : MonoBehaviour
     }
 
     public string TryBuyHeal()
+    {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyHeal();
+        GameTelemetry.ShopPurchase("Heal", "heal", failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyHeal()
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -820,6 +871,15 @@ public sealed class GameManager : MonoBehaviour
 
     // 슬롯 업그레이드 진열 칸 구매. 산 칸은 다음 갱신까지 빈 칸으로 남는다.
     public string TryBuySlotUpgrade(int _offerIndex)
+    {
+        int balanceBefore = wallet.Balance;
+        string perkId = slotOffers.Get(_offerIndex);
+        string failure = BuySlotUpgrade(_offerIndex);
+        GameTelemetry.ShopPurchase("SlotUpgrade", perkId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuySlotUpgrade(int _offerIndex)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -874,7 +934,9 @@ public sealed class GameManager : MonoBehaviour
         {
             weapon.CancelReload();
             SpawnGroundWeapon(outgoing, spot);
+            GameTelemetry.WeaponDropped(outgoing.WeaponId, outgoing.Magazine, "PickupSwap");
             loadout.Put(loadout.ActiveIndex, picked);
+            GameTelemetry.WeaponAcquired("WeaponPickedUp", picked.WeaponId, loadout.ActiveIndex, outgoing.WeaponId, picked.Magazine);
             ApplyActiveWeapon();
         }
         else
@@ -886,6 +948,7 @@ public sealed class GameManager : MonoBehaviour
                 weapon.CancelReload();
             }
             loadout.Put(empty, picked);
+            GameTelemetry.WeaponAcquired("WeaponPickedUp", picked.WeaponId, empty, "", picked.Magazine);
             if (wasAkimbo)
             {
                 ApplyActiveWeapon();

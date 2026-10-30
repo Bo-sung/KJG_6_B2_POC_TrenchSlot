@@ -69,6 +69,7 @@ public sealed class PlayerHealth : MonoBehaviour
         {
             return;
         }
+        GameTelemetry.PlayerDamaged(previous - CurrentHealth, CurrentHealth, maxHealth);
         HealthChanged?.Invoke(CurrentHealth, maxHealth);
         if (_sourceWorldPosition.HasValue)
         {

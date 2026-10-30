@@ -65,12 +65,15 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
     {
         if (!CanInteract())
         {
+            LogRejected();
             return;
         }
 
         int cost = CurrentCost;
+        GameTelemetry.SlotSpinRequested(cost, gameManager.Wallet.Balance);
         if (!gameManager.Wallet.TrySpend(cost))
         {
+            GameTelemetry.SlotSpinRejected("InsufficientFunds", cost, gameManager.Wallet.Balance);
             return;
         }
 
@@ -85,12 +88,24 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         if (!started)
         {
             gameManager.Wallet.Add(cost);
+            GameTelemetry.SlotSpinRejected("ReelsBusy", cost, gameManager.Wallet.Balance);
             return;
         }
 
         lastSpinWave = wave;
         spinning = true;
+        GameTelemetry.SlotSpinStarted(cost, gameManager.Wallet.Balance, seconds, faces);
         SpinStarted?.Invoke(cost);
+    }
+
+    // 상호작용 조건이 안 맞아 회전하지 못한 요청. 비용·소지금을 바꾸지 않는다.
+    private void LogRejected()
+    {
+        string reason = spinning || (reels != null && reels.IsSpinning) ? "Spinning"
+            : reels == null || gameManager == null ? "NotReady"
+            : !gameManager.IsWaveActive ? "WaveInactive"
+            : "InsufficientFunds";
+        GameTelemetry.SlotSpinRejected(reason, CurrentCost, gameManager != null && gameManager.Wallet != null ? gameManager.Wallet.Balance : 0);
     }
 
     // 릴마다 독립 추첨한다. 탄약 심볼 가중치 배수는 퍽 보유에 따라 달라진다.
@@ -154,6 +169,8 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
             text.Append("꽝");
         }
 
+        GameTelemetry.SlotSpinResolved(_outcome, payout, _piggyMultiplier, gameManager.Wallet.Balance,
+            weapon != null ? weapon.Ammo : 0, weapon != null ? weapon.ReserveAmmo : 0);
         SpinResolved?.Invoke(_outcome, payout, text.ToString());
     }
 }

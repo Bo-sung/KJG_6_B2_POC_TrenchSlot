@@ -153,3 +153,10 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# LogKit: 로컬 서버 주소·API 키 덮어쓰기와 로그 산출물(기본 저장 위치는 persistentDataPath/Logs라 저장소 밖이다).
+**/Assets/Resources/TelemetryLocalData.json
+**/Assets/Resources/TelemetryLocalData.json.meta
+*.jsonl
+*.metrics.json
+*.progress.json

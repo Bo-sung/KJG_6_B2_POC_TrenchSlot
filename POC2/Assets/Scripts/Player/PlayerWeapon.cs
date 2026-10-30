@@ -629,6 +629,9 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 산탄은 같은 그룹 번호를 붙여, 전투 쪽이 발사 1회 저지력 합산 상한과 1회 넉백을 적용하게 한다.
         int pellets = Mathf.Max(1, handSettings.pellets);
         int group = pellets > 1 ? ++pelletGroupCounter : 0;
+        var firedWeapon = Hand(hand);
+        string firedWeaponId = firedWeapon != null ? firedWeapon.WeaponId : "";
+        int shotId = GameTelemetry.PlayerShotFired(firedWeaponId, hand, pellets, Ammo, ReserveAmmo, akimbo, IsAiming);
         var shot = new Projectile.Shot
         {
             team = Projectile.Team.Player,
@@ -655,7 +658,7 @@ public sealed class PlayerWeapon : MonoBehaviour
             Projectile projectile = ProjectileSpawner.Launch(ProjectileSpawner.PLAYER_BULLET, shot, origin, direction, hitLayers, OwnerRoot());
             if (projectile != null)
             {
-                projectile.Impacted += _impact => OnProjectileImpact(_impact, group);
+                projectile.Impacted += _impact => OnProjectileImpact(_impact, group, shotId, firedWeaponId);
             }
         }
     }
@@ -718,12 +721,13 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     // 탄이 적에게 실제로 피해를 준 경우에만 확정 적중을 올린다. 벽·지형 명중은 무시한다.
     // 산탄은 같은 발사 그룹의 머리·헬멧 명중을 누적해 알린다(마지막 산탄이 몸통이어도 헤드샷 표시 유지). 피해 계산은 산탄별 그대로다.
-    private void OnProjectileImpact(Projectile.Impact _impact, int _group)
+    private void OnProjectileImpact(Projectile.Impact _impact, int _group, int _shotId, string _weaponId)
     {
         if (!_impact.damagedEnemy)
         {
             return;
         }
+        GameTelemetry.PlayerShotHit(_shotId, _weaponId, _impact.damageDealt, _impact.isHeadshot, _impact.isHelmetHit, _impact.killed, _impact.staggered);
         if (_group > 0)
         {
             if (_group != markerGroup)
