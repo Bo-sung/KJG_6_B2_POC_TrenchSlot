@@ -1508,6 +1508,9 @@ MonoBehaviour:
   fireAction: {fileID: 11400000, guid: 1c2dfd3aa4e708b47b2edbb654e3199c, type: 2}
   reloadAction: {fileID: 11400000, guid: 574ff38980c537048a060a0b7a494b08, type: 2}
   pickupAction: {fileID: 11400000, guid: f742ba416689ff948bbc453d59973ef3, type: 2}
+  slotActions:
+  - {fileID: 11400000, guid: b254d48c01d44a2419cf27aae32871ae, type: 2}
+  - {fileID: 11400000, guid: a0b842476ec24fb4191b549180139217, type: 2}
   aimCamera: {fileID: 621635144}
   health: {fileID: 933281247}
   interactor: {fileID: 933281244}
@@ -1521,6 +1524,12 @@ MonoBehaviour:
     shotsPerSecond: 0
     reloadSeconds: 0
     automatic: 0
+    pellets: 0
+    spreadDegrees: 0
+    stoppingPower: 0
+    pelletStoppingPowerCap: 0
+    knockback: 0
+    ammoSaveChance: 0
     projectileSpeed: 0
     projectileLifetime: 0
     projectileRadius: 0
@@ -1985,14 +1994,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c1cfab4404805c4a875a83f4b32b4da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  ammoPickupPrefab: {fileID: 11400000, guid: 24f55afc53834a73b3e43ed81d556daa, type: 3}
   waves: {fileID: 227273763}
   playerHealth: {fileID: 933281247}
   weapon: {fileID: 933281246}
   interactor: {fileID: 933281244}
+  movement: {fileID: 933281248}
   pickups: {fileID: 1734280677}
   heldModels: {fileID: 1327294749}
   dropRoot: {fileID: 360132918}
+  ammoPickupPrefab: {fileID: 11400000, guid: 24f55afc53834a73b3e43ed81d556daa, type: 3}
 --- !u!4 &1117931882
 Transform:
   m_ObjectHideFlags: 0

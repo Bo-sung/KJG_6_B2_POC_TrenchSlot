@@ -46,6 +46,8 @@ public static class PocPickupPriorityVerification
     private static PlayerInteractor interactor;
     private static Camera view;
     private static WeaponPickupCatalog catalog;
+    // 2번 슬롯을 채우는 무기. 바닥 개수 검사에 섞이지 않도록 검사 대상과 다른 종류로 둔다.
+    private const string FILLER_WEAPON = "colt1878";
     private static Transform dropRoot;
     private static readonly List<GameObject> walls = new List<GameObject>();
     private static MethodInfo weaponUpdate;
@@ -117,7 +119,7 @@ public static class PocPickupPriorityVerification
                 EditorApplication.delayCall += () =>
                 {
                     Debug.Log($"{TAG} 결과 pass={passes} fail={failures}");
-                    EditorApplication.Exit(failures == 0 ? 0 : 1);
+                    PocEditorExit.Exit(failures == 0 ? 0 : 1);
                 };
             }
         };
@@ -137,7 +139,7 @@ public static class PocPickupPriorityVerification
               input.FindAction("Player/Pickup").bindings.Any(_b => _b.path == "<Gamepad>/buttonWest"), "게임패드 X는 Reload·Pickup에 같이 묶여 있다");
 
         // 1) 둘러싸인 자리: 낙하 자리가 모두 벽 너머이면 구매·줍기가 돈·무기·픽업을 바꾸지 않고 거부된다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
         AddWall(new Vector3(0f, 1.5f, 0.7f), new Vector3(1.6f, 3f, 0.1f));
         AddWall(new Vector3(0f, 1.5f, -0.7f), new Vector3(1.6f, 3f, 0.1f));
         AddWall(new Vector3(0.7f, 1.5f, 0f), new Vector3(0.1f, 3f, 1.6f));
@@ -146,20 +148,19 @@ public static class PocPickupPriorityVerification
         SetPrivate(gm, "phase", GameManager.GamePhase.Shop);
         gm.Wallet.Add(1000);
         int money = gm.Wallet.Balance;
-        var buyBolt = TableManager.Instance.Shop.items.First(_i => _i.id == "buy_bolt");
-        Check(gm.TryBuy(buyBolt) != "" && gm.Wallet.Balance == money && gm.Loadout.IsEquipped("revolver") && !gm.Loadout.IsOwned("bolt") && Ground().Count == 0,
+        Check(gm.TryBuyWeapon("win1886", 0) != "" && gm.Wallet.Balance == money && gm.Loadout.ActiveWeaponId == "m1873" && gm.Loadout.Get(1)?.WeaponId != "win1886" && Ground().Count == 0,
             "벽에 둘러싸여 놓을 자리가 없으면 구매가 거부되고 소지금·무기·바닥이 그대로다");
         SetPrivate(gm, "phase", GameManager.GamePhase.Wave);
-        WeaponPickup boxed = Spawn("smg", new Vector3(0f, 0f, 0.35f), 7);
+        WeaponPickup boxed = Spawn("mp18", new Vector3(0f, 0f, 0.35f), 7);
         Aim(boxed);
-        Check(gm.TryPickup(boxed) != "" && !boxed.IsConsumed && gm.Loadout.IsEquipped("revolver") && Ground().Count == 1,
+        Check(gm.TryPickup(boxed) != "" && !boxed.IsConsumed && gm.Loadout.ActiveWeaponId == "m1873" && Ground().Count == 1,
             "벽 너머로만 놓을 수 있으면 줍기가 거부되고 픽업은 소비되지 않는다");
 
         // 2) 벽 한 면: 바로 앞 후보(z=1.2)는 벽 너머라 거르고, 벽 안쪽 자리만 고른다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
         AddWall(new Vector3(0f, 1.5f, 0.95f), new Vector3(6f, 3f, 0.1f));
         Physics.SyncTransforms();
-        object[] args = { Vector3.zero, null, catalog.Find("revolver") };
+        object[] args = { Vector3.zero, null, PickupPrefab("m1873") };
         bool found = (bool)typeof(GameManager).GetMethod("TryFindDropSpot", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(gm, args);
         Vector3 spot = (Vector3)args[0];
         Check(found && spot.z < 0.9f && !Physics.Linecast(new Vector3(0f, 0.9f, 0f), spot + Vector3.up * 0.15f),
@@ -168,8 +169,8 @@ public static class PocPickupPriorityVerification
         // 3) X + 유효 픽업: Update 순서 세 가지 모두 한 번만 바꾸고 어느 총도 재장전하지 않는다.
         foreach (Order mode in new[] { Order.WeaponFirst, Order.InteractorFirst, Order.Natural })
         {
-            foreach (var step in ResetCase("revolver", 2)) yield return step;
-            WeaponPickup bolt = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
+            foreach (var step in ResetCase("m1873", 2)) yield return step;
+            WeaponPickup bolt = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
             Aim(bolt);
             // 조준 판정은 프레임 단위 캐시라 카메라를 돌린 다음 프레임에 확인한다.
             foreach (var step in WaitFrames(1)) yield return step;
@@ -177,45 +178,45 @@ public static class PocPickupPriorityVerification
             SetOrder(mode);
             foreach (var step in Press(PadX())) yield return step;
             foreach (var step in WaitFrames(3)) yield return step;
-            Check(gm.Loadout.IsEquipped("bolt") && weapon.Ammo == 3 && !weapon.IsReloading, $"[{mode}] X 줍기는 탄약 3발을 잇고 재장전하지 않는다");
+            Check(gm.Loadout.ActiveWeaponId == "win1886" && weapon.Ammo == 3 && !weapon.IsReloading, $"[{mode}] X 줍기는 탄약 3발을 잇고 재장전하지 않는다");
             var ground = Ground();
-            Check(ground.Count == 1 && ground[0].WeaponId == "revolver" && ground[0].Ammo == 2 && bolt == null, $"[{mode}] 이전 리볼버만 탄약 2발로 놓이고 픽업은 소비된다");
+            Check(ground.Count == 1 && ground[0].WeaponId == "m1873" && ground[0].Ammo == 2 && bolt == null, $"[{mode}] 이전 리볼버만 탄약 2발로 놓이고 픽업은 소비된다");
         }
 
         // 4) R은 유효 픽업을 보고 있어도 재장전하고 줍지 않는다.
         foreach (Order mode in new[] { Order.WeaponFirst, Order.InteractorFirst })
         {
-            foreach (var step in ResetCase("revolver", 2)) yield return step;
-            WeaponPickup bolt = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
+            foreach (var step in ResetCase("m1873", 2)) yield return step;
+            WeaponPickup bolt = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
             Aim(bolt);
             SetOrder(mode);
             foreach (var step in Press(new KeyboardState(Key.R))) yield return step;
-            Check(weapon.IsReloading && gm.Loadout.IsEquipped("revolver") && bolt != null && !bolt.IsConsumed, $"[{mode}] R은 픽업 조준 중에도 재장전하고 줍지 않는다");
+            Check(weapon.IsReloading && gm.Loadout.ActiveWeaponId == "m1873" && bolt != null && !bolt.IsConsumed, $"[{mode}] R은 픽업 조준 중에도 재장전하고 줍지 않는다");
         }
 
         // 5) 대상 없는 X는 재장전한다.
         foreach (Order mode in new[] { Order.WeaponFirst, Order.InteractorFirst })
         {
-            foreach (var step in ResetCase("revolver", 2)) yield return step;
+            foreach (var step in ResetCase("m1873", 2)) yield return step;
             view.transform.rotation = Quaternion.LookRotation(Vector3.up);
             SetOrder(mode);
             foreach (var step in Press(PadX())) yield return step;
-            Check(weapon.IsReloading && gm.Loadout.IsEquipped("revolver"), $"[{mode}] 줍을 대상이 없으면 X는 재장전한다");
+            Check(weapon.IsReloading && gm.Loadout.ActiveWeaponId == "m1873", $"[{mode}] 줍을 대상이 없으면 X는 재장전한다");
         }
 
         // 6) 한 프레임에 Update가 두 번씩 돌아도 줍기는 한 번이다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
-        WeaponPickup once = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
+        WeaponPickup once = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
         Aim(once);
         SetOrder(Order.Twice);
         foreach (var step in Press(PadX())) yield return step;
-        Check(gm.Loadout.IsEquipped("bolt") && !weapon.IsReloading && Ground().Count == 1 && Ground()[0].WeaponId == "revolver", "같은 프레임 중복 호출에도 교환은 한 번이다");
+        Check(gm.Loadout.ActiveWeaponId == "win1886" && !weapon.IsReloading && Ground().Count == 1 && Ground()[0].WeaponId == "m1873", "같은 프레임 중복 호출에도 교환은 한 번이다");
 
         // 7) 같은 프레임 직접 호출 A/B/A: 세 번째는 거부되고 무기가 복제되지 않는다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
         SetOrder(Order.WeaponFirst);
-        WeaponPickup a = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
-        WeaponPickup b = Spawn("smg", new Vector3(1.6f, 0f, 1.6f), 7);
+        WeaponPickup a = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
+        WeaponPickup b = Spawn("mp18", new Vector3(1.6f, 0f, 1.6f), 7);
         int frame = Time.frameCount;
         Aim(a);
         string first = gm.TryPickup(a);
@@ -224,22 +225,22 @@ public static class PocPickupPriorityVerification
         Aim(a);
         string third = gm.TryPickup(a);
         Check(Time.frameCount == frame && first == "" && second == "" && third != "", "같은 프레임 A/B/A에서 세 번째 A는 거부된다");
-        Check(gm.Loadout.IsEquipped("smg") && weapon.Ammo == 7, "A/B 뒤 기관단총을 저장 탄약 그대로 든다");
+        Check(gm.Loadout.ActiveWeaponId == "mp18" && weapon.Ammo == 7, "A/B 뒤 기관단총을 저장 탄약 그대로 든다");
         yield return null;
         var after = Ground();
-        Check(after.Count == 2 && after.Count(_p => _p.WeaponId == "revolver" && _p.Ammo == 2) == 1 && after.Count(_p => _p.WeaponId == "bolt" && _p.Ammo == 3) == 1,
+        Check(after.Count == 2 && after.Count(_p => _p.WeaponId == "m1873" && _p.Ammo == 2) == 1 && after.Count(_p => _p.WeaponId == "win1886" && _p.Ammo == 3) == 1,
             "A/B/A 뒤 바닥에는 리볼버·볼트액션이 한 자루씩만 있다");
 
         // 8) 사거리 밖 픽업은 프롬프트·직접 호출 모두 거부된다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
-        WeaponPickup far = Spawn("bolt", new Vector3(0f, 0f, 5f), 3);
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
+        WeaponPickup far = Spawn("win1886", new Vector3(0f, 0f, 5f), 3);
         Aim(far);
         foreach (var step in WaitFrames(1)) yield return step;
-        Check(interactor.AimedPickup == null && gm.TryPickup(far) != "" && !far.IsConsumed && gm.Loadout.IsEquipped("revolver"), "사거리 밖 픽업은 거부된다");
+        Check(interactor.AimedPickup == null && gm.TryPickup(far) != "" && !far.IsConsumed && gm.Loadout.ActiveWeaponId == "m1873", "사거리 밖 픽업은 거부된다");
 
         // 9) 벽 너머 픽업: 상호작용 레이어 질의엔 걸려도 시선이 막혀 거부되고, X는 재장전으로 돌아간다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
-        WeaponPickup hidden = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
+        WeaponPickup hidden = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
         AddWall(new Vector3(0f, 1.5f, 1.5f), new Vector3(3f, 3f, 0.1f));
         Physics.SyncTransforms();
         Aim(hidden);
@@ -247,16 +248,16 @@ public static class PocPickupPriorityVerification
         Check(interactor.AimedPickup == null && gm.TryPickup(hidden) != "" && !hidden.IsConsumed, "벽 너머 픽업은 직접 호출도 거부된다");
         SetOrder(Order.Natural);
         foreach (var step in Press(PadX())) yield return step;
-        Check(weapon.IsReloading && gm.Loadout.IsEquipped("revolver") && !hidden.IsConsumed, "벽 너머 픽업을 보고 누른 X는 재장전한다");
+        Check(weapon.IsReloading && gm.Loadout.ActiveWeaponId == "m1873" && !hidden.IsConsumed, "벽 너머 픽업을 보고 누른 X는 재장전한다");
 
         // 10) 지난 조준 캐시로 들어온 직접 호출: 조준이 유효했던 픽업이라도 지금 시선 밖이면 거부된다.
-        foreach (var step in ResetCase("revolver", 2)) yield return step;
-        WeaponPickup stale = Spawn("bolt", new Vector3(0f, 0f, 2.2f), 3);
+        foreach (var step in ResetCase("m1873", 2)) yield return step;
+        WeaponPickup stale = Spawn("win1886", new Vector3(0f, 0f, 2.2f), 3);
         Aim(stale);
         foreach (var step in WaitFrames(1)) yield return step;
         bool wasAimed = interactor.AimedPickup == stale;
         view.transform.rotation = Quaternion.LookRotation(Vector3.up);
-        Check(wasAimed && gm.TryPickup(stale) != "" && !stale.IsConsumed && gm.Loadout.IsEquipped("revolver"), "조준이 벗어난 뒤의 직접 줍기는 거부된다");
+        Check(wasAimed && gm.TryPickup(stale) != "" && !stale.IsConsumed && gm.Loadout.ActiveWeaponId == "m1873", "조준이 벗어난 뒤의 직접 줍기는 거부된다");
 
         Debug.Log($"{TAG} 플레이 검사 완료");
     }
@@ -365,9 +366,11 @@ public static class PocPickupPriorityVerification
         }
         walls.Clear();
         InvokePrivate(gm, "ClearGroundWeapons");
-        gm.Loadout.Own(_equip);
-        gm.Loadout.Equip(_equip);
-        InvokePrivate(gm, "ApplyWeapon", _equip, _ammo);
+        // 두 슬롯을 채워 줍기가 사용 중 무기와 교환되게 한다(빈 슬롯이 있으면 빈 칸에 들어간다).
+        gm.Loadout.Put(0, new WeaponInstance(_equip, _ammo));
+        gm.Loadout.Put(1, new WeaponInstance(FILLER_WEAPON, 0));
+        gm.Loadout.SetActive(0);
+        InvokePrivate(gm, "ApplyActiveWeapon");
         weapon.CancelReload();
         SetPrivate(gm, "waveTimeLeft", 9999f);
         SetOrder(Order.Natural);
@@ -405,10 +408,15 @@ public static class PocPickupPriorityVerification
         }
     }
 
+    private static WeaponPickup PickupPrefab(string _weaponId)
+    {
+        return catalog.Find(WeaponInfo.Find(TableManager.Instance.Weapon, _weaponId).modelId, TableManager.Instance.Weapon.drop.fallbackModelId);
+    }
+
     private static WeaponPickup Spawn(string _id, Vector3 _position, int _ammo)
     {
-        WeaponPickup pickup = UnityEngine.Object.Instantiate(catalog.Find(_id), _position, Quaternion.identity, dropRoot);
-        pickup.Initialize(_id, "", _ammo);
+        WeaponPickup pickup = UnityEngine.Object.Instantiate(PickupPrefab(_id), _position, Quaternion.identity, dropRoot);
+        pickup.Initialize(new WeaponInstance(_id, _ammo), "");
         Physics.SyncTransforms();
         return pickup;
     }

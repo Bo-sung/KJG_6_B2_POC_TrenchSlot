@@ -70,7 +70,7 @@ public static class PocWaveRecoveryVerification
         Check(GameConfigInfo.WaveClearBonus(extreme, int.MaxValue) == int.MaxValue,
             "infinite-wave bonus calculation cannot wrap negative");
         Debug.Log($"{TAG} config checks finished: passes={passes}, failures={failures}, expectedValidationErrors={errors}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     private static void Tick()
@@ -188,16 +188,14 @@ public static class PocWaveRecoveryVerification
         Check(completionWalletEvents == 1, "wallet-event reentrant completion cannot duplicate rewards");
         Check(!InputGate.PlayerEnabled && !waves.IsRunning && Projectile.ActiveCount == 0,
             "shop transition preserves input gate and combat/projectile cleanup");
-        Check(SlotButton("bolt").interactable && SlotButton("smg").interactable,
-            "both 150 weapons become affordable on actual first-shop UI");
-        foreach (var item in table.Shop.items)
+        Check(WeaponBuyButton("win1886").interactable && WeaponBuyButton("colt1878").interactable,
+            "both 1887 shop weapons become affordable on actual first-shop UI");
+        Check(!WeaponBuyButton("mp18").interactable, "WW1 weapon stays locked in the first shop");
+        for (int i = 0; i < game.SlotOffers.Count; i++)
         {
-            if (item.type == ShopInfo.TYPE_PERK)
-            {
-                Check(SlotButton(item.target).interactable, $"perk {item.target} affordable after auto recovery");
-            }
+            Check(game.SlotOffers.IsSoldOut(i) || UpgradeButton(i).interactable, $"slot upgrade offer {i} affordable after auto recovery");
         }
-        Check(game.CanHeal && SlotButton(ShopInfo.TYPE_HEAL).interactable,
+        Check(game.CanHeal && HealButton().interactable,
             "optional heal remains useful and affordable after partial auto recovery");
         Check(ShopMessage().Contains("HP +20") && ShopMessage().Contains("+$100"),
             "shop MVP summary shows actual restored health and paid bonus");
@@ -208,8 +206,7 @@ public static class PocWaveRecoveryVerification
         Call(game, "EndWave");
         Check(game.Wallet.Balance == 150 && player.CurrentHealth == 45f && completionEvents == 1,
             "repeated completion grants neither health nor money nor event");
-        var heal = FindItem(ShopInfo.TYPE_HEAL);
-        Check(game.TryBuy(heal) == "" && player.CurrentHealth == 75f && game.Wallet.Balance == 120,
+        Check(game.TryBuyHeal() == "" && player.CurrentHealth == 75f && game.Wallet.Balance == 120,
             "optional shop heal still costs 30 and restores 30 after automatic recovery");
 
         waves.enabled = false;
@@ -222,10 +219,10 @@ public static class PocWaveRecoveryVerification
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "wave two timer reaches shop");
         Check(player.CurrentHealth == 100f && game.WaveHealthRestored == 0f && game.Wallet.Balance == before + 110,
             "wave two full health has zero overheal and exact 110 bonus");
-        Check(!game.CanHeal && !SlotButton(ShopInfo.TYPE_HEAL).interactable && ShopMessage().Contains("HP +0"),
+        Check(!game.CanHeal && !HealButton().interactable && ShopMessage().Contains("HP +0"),
             "full-health recovery summary is zero and shop heal is disabled");
         before = game.Wallet.Balance;
-        Check(game.TryBuy(heal) != "" && game.Wallet.Balance == before, "full-health optional heal cannot charge money");
+        Check(game.TryBuyHeal() != "" && game.Wallet.Balance == before, "full-health optional heal cannot charge money");
 
         game.StartNextWave();
         player.ApplyDamage(5f);
@@ -234,7 +231,7 @@ public static class PocWaveRecoveryVerification
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "near-max-health timer reaches shop");
         Check(player.CurrentHealth == 100f && game.WaveHealthRestored == 5f && game.Wallet.Balance == before + 120,
             "near-max health restores only missing 5 (95 to 100), not configured 20");
-        Check(ShopMessage().Contains("HP +5") && !SlotButton(ShopInfo.TYPE_HEAL).interactable,
+        Check(ShopMessage().Contains("HP +5") && !HealButton().interactable,
             "clipped recovery refreshes shop to full-health state with actual +5 summary");
 
         Call(game, "StartWave", 12);
@@ -264,12 +261,12 @@ public static class PocWaveRecoveryVerification
         Check(game.Wallet.Balance == spinBalance - cost + 220 && game.WaveBonusPaid == 220 && slot.IsSpinning,
             "wave thirteen pays exact 220 before independent in-flight slot payout");
         // Make weapons initially unaffordable while preserving the pending real payout.
-        game.Wallet.TrySpend(game.Wallet.Balance - 145);
-        Check(!SlotButton("bolt").interactable, "shop weapon initially disabled before late slot payout");
+        game.Wallet.TrySpend(game.Wallet.Balance - 85);
+        Check(!WeaponBuyButton("colt1878").interactable, "shop weapon initially disabled before late slot payout");
         yield return Wait(() => !slot.IsSpinning, 8f, "real reel animation completes in shop");
-        Check(spinEvents == 1 && spinPayout > 0 && game.Wallet.Balance == 145 + spinPayout,
+        Check(spinEvents == 1 && spinPayout > 0 && game.Wallet.Balance == 85 + spinPayout,
             "in-flight winning slot pays exactly once in shop (no completion duplication)");
-        Check(SlotButton("bolt").interactable, "late wallet payout refreshes shop affordability");
+        Check(spinPayout < 5 || WeaponBuyButton("colt1878").interactable, "late wallet payout refreshes shop affordability");
         Check(ShopMessage().Contains("+$220"), "slot feedback does not erase shop completion summary");
 
         game.StartNextWave();
@@ -313,23 +310,29 @@ public static class PocWaveRecoveryVerification
         throw new InvalidOperationException("Could not seed winning spin.");
     }
 
-    private static ShopData.Item FindItem(string _target)
+    // 무기를 실제 상점 화면에서 선택한 뒤, 빈 슬롯(없으면 1번) 구매 버튼을 돌려준다.
+    private static Button WeaponBuyButton(string _weaponId)
     {
-        foreach (var item in TableManager.Instance.Shop.items)
-        {
-            if (item.target == _target || item.type == _target)
-            {
-                return item;
-            }
-        }
-        throw new InvalidOperationException("Shop item not found: " + _target);
+        var presenter = UnityEngine.Object.FindFirstObjectByType<ShopPresenter>();
+        int index = Array.FindIndex(TableManager.Instance.Shop.weapons, _o => _o.weaponId == _weaponId);
+        Call(presenter, "OnWeaponSelected", index);
+        var game = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+        int slot = Math.Max(0, game.Loadout.FirstEmptySlot());
+        var buttons = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "weaponBuyButtons");
+        return buttons[slot].Button;
     }
 
-    private static Button SlotButton(string _target)
+    private static Button UpgradeButton(int _index)
     {
-        var view = UnityEngine.Object.FindFirstObjectByType<ShopView>();
-        var buttons = (Button[])Get(view, "slotButtons");
-        return buttons[Array.IndexOf(TableManager.Instance.Shop.items, FindItem(_target))];
+        var rows = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "upgradeRows");
+        return rows[_index].Button;
+    }
+
+    // 보급 줄은 체력 회복이 맨 위다.
+    private static Button HealButton()
+    {
+        var rows = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "supplyRows");
+        return rows[0].Button;
     }
 
     private static string ShopMessage() => TextField(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "messageText").text;
@@ -390,6 +393,6 @@ public static class PocWaveRecoveryVerification
     {
         SessionState.SetBool(RUNNING, false);
         Debug.Log($"{TAG} finished real play-mode frames={Time.frameCount}, passes={passes}, failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 }

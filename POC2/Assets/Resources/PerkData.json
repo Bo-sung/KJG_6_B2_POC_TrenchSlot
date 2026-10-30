@@ -1,8 +1,10 @@
 {
   "perks": [
-    { "id": "discountLever", "name": "할인 레버", "description": "회전 비용 -20% (스택당)", "maxStack": 2, "value": 0.2 },
-    { "id": "killStack", "name": "킬 스택", "description": "처치 1회당 다음 지급 +2% (웨이브 리셋, 스택당)", "maxStack": 5, "value": 0.02 },
+    { "id": "discountLever", "name": "할인 레버", "description": "회전 비용 -20%", "maxStack": 1, "value": 0.2 },
+    { "id": "killStack", "name": "킬 스택", "description": "처치 1회당 다음 지급 +2% (웨이브 리셋)", "maxStack": 1, "value": 0.02 },
     { "id": "fastSpindle", "name": "고속 스핀들", "description": "회전 시간 -30%", "maxStack": 1, "value": 0.3 },
-    { "id": "ammoSymbol", "name": "탄약 심볼", "description": "탄약 심볼 가중치 x3 (탄창 즉시 재장전)", "maxStack": 1, "value": 3 }
+    { "id": "ammoSymbol", "name": "탄약 심볼", "description": "탄약 심볼 가중치 x3 (탄창 즉시 재장전)", "maxStack": 1, "value": 3 },
+    { "id": "payPlus", "name": "페이플러스", "description": "슬롯 지급 +15%", "maxStack": 1, "value": 0.15 },
+    { "id": "piggyBank", "name": "이월 저금통", "description": "직전 웨이브에 회전하지 않았으면 이번 웨이브 첫 회전 지급 x2", "maxStack": 1, "value": 2 }
   ]
 }

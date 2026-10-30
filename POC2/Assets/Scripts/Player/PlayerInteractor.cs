@@ -27,6 +27,8 @@ public sealed class PlayerInteractor : MonoBehaviour
 
     // 픽업 가능 여부 판정. GameManager가 등록한다(자리·상태 확인). 없으면 픽업 불가로 본다.
     public Func<WeaponPickup, bool> CanPickup;
+    // 픽업 안내 문구. GameManager가 빈 슬롯 여부에 맞춰 등록한다. 없으면 기본 문구를 쓴다.
+    public Func<WeaponPickup, string> PickupPromptText;
 
     // 지금 카메라 정면으로 조준된 유효한 픽업 대상. 없으면 null이다. 이번 프레임에 새로 판정한다.
     public WeaponPickup AimedPickup
@@ -174,8 +176,12 @@ public sealed class PlayerInteractor : MonoBehaviour
     }
 
     // 픽업 안내는 키 표기(F·X)와 무기 이름을 보인다. 이름이 비어 있으면 id를 쓴다.
-    private static string PickupPrompt(WeaponPickup _pickup)
+    private string PickupPrompt(WeaponPickup _pickup)
     {
+        if (PickupPromptText != null)
+        {
+            return PickupPromptText(_pickup);
+        }
         string label = string.IsNullOrEmpty(_pickup.DisplayName) ? _pickup.WeaponId : _pickup.DisplayName;
         return $"[F / X] {label} 줍기 · 현재 무기는 바닥에 놓임";
     }

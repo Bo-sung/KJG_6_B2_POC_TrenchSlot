@@ -73,7 +73,7 @@ public static class PocEnemyVisibilityVerification
             Debug.LogException(exception);
         }
         Debug.Log($"[PocEnemyVisibilityVerification] passes={passes} failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     private static void Checks()
@@ -166,10 +166,11 @@ public static class PocEnemyVisibilityVerification
         var go = UnityEngine.Object.Instantiate(prefab, spawn, Quaternion.identity);
         var inspected = go.GetComponent<Enemy>();
         inspected.enabled = false;
-        foreach (int wave in new[] { 1, 3, 4, 9, 10, 20 })
+        // 시대 구간: 1~5 MUSKET · 6~10 WWI · 11~ WWII(상점-세부설계 §2).
+        foreach (int wave in new[] { 1, 5, 6, 10, 11, 20 })
         {
             string id = WaveInfo.Resolve(table.Wave, wave).enemyWeapon;
-            string expected = wave <= 3 ? "musket" : wave <= 9 ? "wwi_rifle" : "wwii_rifle";
+            string expected = wave <= 5 ? "musket" : wave <= 10 ? "wwi_rifle" : "wwii_rifle";
             Check(id == expected, "wave era boundary preserved at " + wave);
             inspected.Configure(EnemyInfo.Find(table.Enemy, EnemyInfo.RIFLEMAN_ID), EnemyWeaponInfo.Find(table.EnemyWeapon, id), 1f, Color.red, player);
             var mount = go.transform.Find("WeaponMount");

@@ -32,7 +32,7 @@ public static class PocProjectileVerification
         CheckEnemyFireDoesNotDamageDirectly();
 
         Debug.Log($"{TAG} finished: failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     // ---------- 테이블·프리팹 ----------

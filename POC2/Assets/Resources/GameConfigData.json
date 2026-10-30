@@ -7,6 +7,7 @@
   "waveClearBonusPerWave": 10,
   "intermissionSeconds": 30,
   "interactDistance": 4,
+  "weaponSlotCount": 2,
   "crouchHeightRatio": 0.55,
   "crouchSpeedRatio": 0.5,
   "crouchCameraSmoothSeconds": 0.12,

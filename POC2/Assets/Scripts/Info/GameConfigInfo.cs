@@ -26,6 +26,8 @@ public static class GameConfigInfo
 
     public static float InteractDistance(GameConfigData _table) => _table != null ? _table.interactDistance : 0f;
 
+    public static int WeaponSlotCount(GameConfigData _table) => _table != null && _table.weaponSlotCount > 0 ? _table.weaponSlotCount : 2;
+
     // Defaults are compatibility fallbacks for old tables / isolated component tests.
     public static float CrouchHeightRatio(GameConfigData _table) => _table != null && _table.crouchHeightRatio > 0f ? Mathf.Clamp(_table.crouchHeightRatio, 0.1f, 1f) : 0.55f;
     public static float CrouchSpeedRatio(GameConfigData _table) => _table != null && _table.crouchSpeedRatio > 0f ? Mathf.Clamp01(_table.crouchSpeedRatio) : 0.5f;

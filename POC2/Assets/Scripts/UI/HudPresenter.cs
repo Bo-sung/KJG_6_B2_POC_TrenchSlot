@@ -35,8 +35,10 @@ public sealed class HudPresenter : MonoBehaviour
             gameManager.KillsChanged += OnKillsChanged;
             gameManager.Wallet.BalanceChanged += OnMoneyChanged;
             gameManager.GameOver += OnGameOver;
+            gameManager.PhaseChanged += OnPhaseChanged;
             OnMoneyChanged(gameManager.Wallet.Balance);
             OnKillsChanged(gameManager.KillsThisWave);
+            gameManager.Loadout.Changed += RefreshAmmo;
             ammoInventory = gameManager.Ammo;
             if (ammoInventory != null)
             {
@@ -60,7 +62,7 @@ public sealed class HudPresenter : MonoBehaviour
         }
         if (weapon != null)
         {
-            weapon.EnemyHit += view.ShowHitMarker;
+            weapon.EnemyImpact += OnEnemyImpact;
             weapon.AmmoChanged += OnAmmoChanged;
             RefreshAmmo();
         }
@@ -85,6 +87,8 @@ public sealed class HudPresenter : MonoBehaviour
             gameManager.KillsChanged -= OnKillsChanged;
             gameManager.Wallet.BalanceChanged -= OnMoneyChanged;
             gameManager.GameOver -= OnGameOver;
+            gameManager.PhaseChanged -= OnPhaseChanged;
+            gameManager.Loadout.Changed -= RefreshAmmo;
         }
         if (playerHealth != null)
         {
@@ -102,7 +106,7 @@ public sealed class HudPresenter : MonoBehaviour
         }
         if (weapon != null)
         {
-            weapon.EnemyHit -= view.ShowHitMarker;
+            weapon.EnemyImpact -= OnEnemyImpact;
             weapon.AmmoChanged -= OnAmmoChanged;
         }
     }
@@ -114,6 +118,16 @@ public sealed class HudPresenter : MonoBehaviour
         {
             RefreshAmmo();
         }
+    }
+
+    private void OnPhaseChanged(GameManager.GamePhase _phase)
+    {
+        view.SetVisible(_phase != GameManager.GamePhase.Shop);
+    }
+
+    private void OnEnemyImpact(Projectile.Impact _impact)
+    {
+        view.ShowHitMarker(_impact.killed, _impact.isHeadshot, _impact.isHelmetHit);
     }
 
     private void OnAmmoChanged(int _ammo, int _magazine)
@@ -133,8 +147,30 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (weapon != null && view != null)
         {
-            view.SetAmmo(weapon.Ammo, weapon.ReserveAmmo, weapon.IsReloading, weapon.ReloadProgress);
+            view.SetAmmo(weapon.Ammo, weapon.ReserveAmmo, weapon.IsReloading, weapon.ReloadProgress, LoadoutLabel());
         }
+    }
+
+    // 예: "[1 Colt SAA M1873]   2 Winchester 1886". 사용 중 슬롯을 대괄호로 표시한다.
+    private string LoadoutLabel()
+    {
+        if (gameManager == null || gameManager.Loadout == null)
+        {
+            return "";
+        }
+        var loadout = gameManager.Loadout;
+        var text = new System.Text.StringBuilder();
+        for (int i = 0; i < loadout.SlotCount; i++)
+        {
+            var held = loadout.Get(i);
+            string name = held != null ? WeaponInfo.DisplayName(TableManager.Instance.Weapon, held.WeaponId) : "-";
+            if (i > 0)
+            {
+                text.Append("   ");
+            }
+            text.Append(i == loadout.ActiveIndex ? $"[{i + 1} {name}]" : $"{i + 1} {name}");
+        }
+        return text.ToString();
     }
 
     private void OnDamagedFrom(Vector3 _source)

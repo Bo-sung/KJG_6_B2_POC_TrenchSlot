@@ -16,6 +16,8 @@ public sealed class GameConfigData
     public float intermissionSeconds;
     // 슬롯 상호작용 거리(m).
     public float interactDistance;
+    // 휴대 무기 슬롯 수(1·2번 키 전환).
+    public int weaponSlotCount = 2;
     // Provisional crouch / presentation tuning; defaults preserve older table callers.
     public float crouchHeightRatio = 0.55f;
     public float crouchSpeedRatio = 0.5f;

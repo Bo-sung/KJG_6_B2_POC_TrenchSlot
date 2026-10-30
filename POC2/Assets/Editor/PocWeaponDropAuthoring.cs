@@ -25,7 +25,9 @@ public static class PocWeaponDropAuthoring
     private const string DROPPED_NAME = "Dropped";
     private const string OLD_REVOLVER_NAME = "Revolver";
 
-    private static readonly string[] WEAPON_IDS = { "revolver", "bolt", "smg" };
+    // 외형 id(WeaponData.modelId). 같은 계열 총기는 외형을 공유한다.
+    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun" };
+    private static readonly string[] WEAPON_IDS = MODEL_IDS;
 
     private static Material metal;
     private static Material wood;
@@ -162,18 +164,52 @@ public static class PocWeaponDropAuthoring
             BuildModel(WEAPON_IDS[i], model);
             entries[i] = new WeaponHeldModels.Entry { id = WEAPON_IDS[i], model = model.gameObject };
         }
-        var heldSo = new SerializedObject(held);
-        var array = heldSo.FindProperty("entries");
-        array.arraySize = entries.Length;
-        for (int i = 0; i < entries.Length; i++)
+        // 아킴보 왼손 외형: 아킴보 허용 무기가 쓰는 외형만, 오른손 모델을 화면 중심 기준 좌우 대칭 자리에 둔다.
+        TableManager.ReloadAfterTableEdit();
+        var offHand = new System.Collections.Generic.List<WeaponHeldModels.Entry>();
+        foreach (string id in WEAPON_IDS)
         {
-            var element = array.GetArrayElementAtIndex(i);
-            element.FindPropertyRelative("id").stringValue = entries[i].id;
-            element.FindPropertyRelative("model").objectReferenceValue = entries[i].model;
+            if (!AkimboModel(id))
+            {
+                continue;
+            }
+            var model = new GameObject(id + "_OffHand").transform;
+            model.SetParent(root.transform, false);
+            model.localPosition = new Vector3(-2f * HELD_LOCAL_POSITION.x, 0f, 0f);
+            BuildModel(id, model);
+            model.gameObject.SetActive(false);
+            offHand.Add(new WeaponHeldModels.Entry { id = id, model = model.gameObject });
         }
+        var heldSo = new SerializedObject(held);
+        AssignEntries(heldSo.FindProperty("entries"), entries);
+        AssignEntries(heldSo.FindProperty("offHandEntries"), offHand.ToArray());
         heldSo.ApplyModifiedPropertiesWithoutUndo();
         PrefabUtility.SaveAsPrefabAsset(root, HELD_PREFAB_PATH);
         Object.DestroyImmediate(root);
+    }
+
+    // 이 외형을 쓰는 무기 중 아킴보 허용 무기가 있는지.
+    private static bool AkimboModel(string _modelId)
+    {
+        foreach (var weapon in TableManager.Instance.Weapon.weapons)
+        {
+            if (weapon != null && weapon.modelId == _modelId && WeaponInfo.CanAkimbo(weapon))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void AssignEntries(SerializedProperty _array, WeaponHeldModels.Entry[] _entries)
+    {
+        _array.arraySize = _entries.Length;
+        for (int i = 0; i < _entries.Length; i++)
+        {
+            var element = _array.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("id").stringValue = _entries[i].id;
+            element.FindPropertyRelative("model").objectReferenceValue = _entries[i].model;
+        }
     }
 
     private static void BuildCatalogPrefab(GameObject[] _pickups)
@@ -217,6 +253,12 @@ public static class PocWeaponDropAuthoring
                 Part(PrimitiveType.Cube, "Barrel", _parent, new Vector3(0f, 0.04f, 0.3f), new Vector3(0.04f, 0.04f, 0.2f), metal);
                 Part(PrimitiveType.Cube, "Stock", _parent, new Vector3(0f, 0.02f, -0.3f), new Vector3(0.05f, 0.08f, 0.2f), wood);
                 break;
+            case "shotgun":
+                Part(PrimitiveType.Cube, "Barrel", _parent, new Vector3(0f, 0.06f, 0.2f), new Vector3(0.05f, 0.05f, 0.75f), metal);
+                Part(PrimitiveType.Cube, "Tube", _parent, new Vector3(0f, 0.01f, 0.18f), new Vector3(0.04f, 0.04f, 0.6f), metal);
+                Part(PrimitiveType.Cube, "Pump", _parent, new Vector3(0f, 0.01f, 0.25f), new Vector3(0.07f, 0.07f, 0.16f), wood);
+                Part(PrimitiveType.Cube, "Stock", _parent, new Vector3(0f, -0.02f, -0.32f), new Vector3(0.07f, 0.12f, 0.32f), wood);
+                break;
             default:
                 Debug.LogError($"PocWeaponDropAuthoring: 알 수 없는 무기 {_id}");
                 break;
@@ -243,6 +285,8 @@ public static class PocWeaponDropAuthoring
                 return new Vector3(0.14f, 0.2f, 1f);
             case "smg":
                 return new Vector3(0.14f, 0.2f, 0.5f);
+            case "shotgun":
+                return new Vector3(0.14f, 0.2f, 0.95f);
             default:
                 return new Vector3(0.14f, 0.2f, 0.56f);
         }

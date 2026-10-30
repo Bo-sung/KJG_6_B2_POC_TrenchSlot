@@ -4,13 +4,16 @@ using UnityEngine;
 
 // 보유 퍽과 스택 수. 효과 계산은 퍽 테이블의 value를 해석해 여기서 한다.
 // value 의미: discountLever=스택당 비용 감소율, killStack=처치당 지급 보너스율, fastSpindle=회전 시간 감소율,
-//             ammoSymbol=탄약 심볼 가중치 배수(보유 시 적용).
+//             ammoSymbol=탄약 심볼 가중치 배수(보유 시 적용), payPlus=스택당 슬롯 지급 증가율,
+//             piggyBank=직전 웨이브 무회전 시 이번 웨이브 첫 회전 지급 배수(보유 시 적용).
 public sealed class PerkInventory
 {
     public const string DISCOUNT_LEVER = "discountLever";
     public const string KILL_STACK = "killStack";
     public const string FAST_SPINDLE = "fastSpindle";
     public const string AMMO_SYMBOL = "ammoSymbol";
+    public const string PAY_PLUS = "payPlus";
+    public const string PIGGY_BANK = "piggyBank";
 
     private readonly PerkData table;
     private readonly Dictionary<string, int> stacks = new Dictionary<string, int>();
@@ -58,6 +61,15 @@ public sealed class PerkInventory
 
     // 웨이브 중 처치 한 번당 지급 보너스 비율(예: 0.02 = +2%).
     public float KillBonusPerKill => EffectValue(KILL_STACK) * StackOf(KILL_STACK);
+
+    // 슬롯 지급 배율(페이플러스). 1 + 스택당 증가율 x 스택.
+    public float PayoutMultiplier => 1f + EffectValue(PAY_PLUS) * StackOf(PAY_PLUS);
+
+    // 이월 저금통 배율. 보유하지 않았거나 조건이 맞지 않으면 1이다. 조건 판정(직전 웨이브 무회전·이번 웨이브 첫 회전)은 호출 측이 한다.
+    public float PiggyBankMultiplier(bool _eligible)
+    {
+        return _eligible && StackOf(PIGGY_BANK) > 0 ? Mathf.Max(1f, EffectValue(PIGGY_BANK)) : 1f;
+    }
 
     public int AmmoWeightScale => StackOf(AMMO_SYMBOL) > 0 ? Mathf.RoundToInt(EffectValue(AMMO_SYMBOL)) : 1;
 

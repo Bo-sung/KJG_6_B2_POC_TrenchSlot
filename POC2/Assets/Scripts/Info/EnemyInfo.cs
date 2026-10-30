@@ -44,6 +44,13 @@ public static class EnemyInfo
             {
                 Debug.LogError($"적 {enemy.id}의 보상이 음수입니다.");
             }
+            if (enemy.headshotMultiplier < 1f || enemy.helmetDamageReduction < 0f || enemy.helmetDamageReduction > 1f ||
+                enemy.stoppingResistance <= 0f || enemy.stoppingDecayRate < 0f || enemy.staggerDuration < 0f ||
+                enemy.staggerImmunityDuration < 0f || enemy.knockbackResistance < 0f || enemy.knockbackResistance > 1f ||
+                enemy.headHeightRatio <= 0f || enemy.headHeightRatio >= 1f)
+            {
+                Debug.LogError($"적 {enemy.id}의 헤드샷·헬멧·저지력·경직·넉백 값이 올바르지 않습니다.");
+            }
         }
     }
 }

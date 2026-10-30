@@ -51,3 +51,5 @@ MonoBehaviour:
     prefab: {fileID: 1833480244409239381, guid: f2fa11b0dd75364409beb36080645c25, type: 3}
   - id: smg
     prefab: {fileID: 8875015160819756290, guid: ee47a5d46ce36754b8b9ab070e3c4c7a, type: 3}
+  - id: shotgun
+    prefab: {fileID: 4362309619675536482, guid: 5be317fc60f039e48a3008c5dd6df53f, type: 3}

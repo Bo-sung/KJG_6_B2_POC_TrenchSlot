@@ -67,23 +67,23 @@ public static class PocWeaponDropVerification
         Application.logMessageReceived -= capture;
         Check(weaponLog == 0, "WeaponInfo.Validate가 drop 규칙을 오류 없이 통과한다");
 
-        var loadout = new WeaponLoadout("revolver");
-        Check(loadout.IsOwned("revolver") && loadout.IsEquipped("revolver"), "시작 무기는 획득·장착 상태다");
-        Check(!loadout.Equip("bolt"), "미획득 무기는 장착할 수 없다(바이패스 차단)");
-        loadout.Own("bolt");
-        Check(loadout.IsOwned("bolt") && !loadout.IsEquipped("bolt"), "구매 기록만으로는 장착되지 않는다");
-        Check(loadout.Equip("bolt") && loadout.IsEquipped("bolt"), "획득한 무기는 들고 있는 무기로 바꿀 수 있다");
-        Check(!loadout.Equip("bolt"), "이미 든 무기 장착은 무시된다");
-        Check(loadout.Equip("revolver") && loadout.IsEquipped("revolver") && loadout.IsOwned("bolt"), "이전 무기로 되돌아가도 획득 기록은 유지된다");
+        var loadout = new WeaponLoadout(2);
+        var first = new WeaponInstance("m1873", 6);
+        var second = new WeaponInstance("m1873", 3);
+        Check(loadout.Put(0, first) == null && loadout.Active == first, "시작 무기는 1번 슬롯 사용 중이다");
+        Check(!loadout.SetActive(1), "빈 슬롯으로는 전환할 수 없다");
+        Check(loadout.Put(1, second) == null && loadout.FirstEmptySlot() < 0, "같은 종류 무기를 두 자루 가질 수 있다");
+        Check(loadout.Put(1, first) == null && loadout.Get(1) == second, "같은 개별 무기를 두 슬롯에 넣지 않는다");
+        Check(loadout.SetActive(1) && loadout.Active == second && first.Magazine == 6 && second.Magazine == 3, "전환 후에도 장전탄은 무기마다 따로 남는다");
 
         var root = new GameObject("WeaponAmmoProbe");
         var weapon = root.AddComponent<PlayerWeapon>();
         var settings = new PlayerWeapon.WeaponSettings { magazineSize = 6, shotsPerSecond = 2.5f, range = 60f, damage = 25f, reloadSeconds = 1.8f, projectileSpeed = 120f, projectileLifetime = 1f, projectileRadius = 0.05f };
-        weapon.Configure(settings);
+        weapon.Configure(new WeaponInstance("m1873", 6), settings, null, "");
         Check(weapon.Ammo == 6, "새 구매 무기는 탄창을 가득 채운다");
-        weapon.Configure(settings, 2);
+        weapon.Configure(new WeaponInstance("m1873", 2), settings, null, "");
         Check(weapon.Ammo == 2, "주운 무기는 저장된 탄약을 그대로 이어받는다");
-        weapon.Configure(settings, 99);
+        weapon.Configure(new WeaponInstance("m1873", 99), settings, null, "");
         Check(weapon.Ammo == 6, "저장 탄약이 탄창을 넘으면 탄창으로 제한한다");
         var ammoTable = JsonUtility.FromJson<AmmoData>(Resources.Load<TextAsset>("AmmoData").text);
         var inventory = new AmmoInventory(ammoTable);
@@ -91,8 +91,8 @@ public static class PocWeaponDropVerification
         InputGate.PlayerEnabled = true;
         try
         {
-            int reserve = inventory.GetReserve("pistol");
-            weapon.Configure(settings, 3, inventory, "pistol");
+            int reserve = inventory.GetReserve("colt45");
+            weapon.Configure(new WeaponInstance("m1873", 3), settings, inventory, "colt45");
             weapon.StartReload();
             Check(weapon.IsReloading && weapon.ReserveAmmo == reserve, "예비탄이 있으면 소비 없이 재장전을 시작한다");
             weapon.CancelReload();
@@ -100,25 +100,19 @@ public static class PocWeaponDropVerification
                 "재장전 취소 후 장전탄과 예비탄은 유지된다");
 
             weapon.StartReload();
-            FieldInfo reloadEndTime = typeof(PlayerWeapon).GetField("reloadEndTime", BindingFlags.NonPublic | BindingFlags.Instance);
-            float endTime = (float)reloadEndTime.GetValue(weapon);
             weapon.GrantSlotAmmo();
-            Check(weapon.Ammo == 6 && weapon.ReserveAmmo == reserve && weapon.IsReloading,
-                "슬롯은 탄창만 무료로 채우고 예비탄과 진행 중 재장전을 유지한다");
-            Check((float)reloadEndTime.GetValue(weapon) == endTime, "슬롯은 재장전 종료 시각을 변경하지 않는다");
-            MethodInfo completeReload = typeof(PlayerWeapon).GetMethod("CompleteReload", BindingFlags.NonPublic | BindingFlags.Instance);
-            completeReload.Invoke(weapon, null);
-            Check(!weapon.IsReloading && weapon.Ammo == 6 && weapon.ReserveAmmo == reserve,
-                "슬롯으로 가득 찬 탄창의 재장전 완료는 예비탄을 소비하지 않는다");
+            // 탄창이 다 찼으니 남은 재장전으로 조작을 묶어 두지 않는다(예비탄 소비 없음).
+            Check(weapon.Ammo == 6 && weapon.ReserveAmmo == reserve && !weapon.IsReloading,
+                "슬롯은 탄창만 무료로 채우고, 할 일이 없어진 진행 중 재장전은 예비탄 소비 없이 끝낸다");
 
             settings.reloadSeconds = 0f;
-            weapon.Configure(settings, 2, inventory, "pistol");
+            weapon.Configure(new WeaponInstance("m1873", 2), settings, inventory, "colt45");
             weapon.StartReload();
             Check(!weapon.IsReloading && weapon.Ammo == 6 && weapon.ReserveAmmo == reserve - 4,
                 "재장전 완료는 부족한 장전탄만큼 예비탄을 소비한다");
-            inventory.Consume("pistol", int.MaxValue);
-            inventory.Add("pistol", 2);
-            weapon.Configure(settings, 1, inventory, "pistol");
+            inventory.Consume("colt45", int.MaxValue);
+            inventory.Add("colt45", 2);
+            weapon.Configure(new WeaponInstance("m1873", 1), settings, inventory, "colt45");
             weapon.StartReload();
             Check(weapon.Ammo == 3 && weapon.ReserveAmmo == 0, "부족한 예비탄만큼만 장전한다");
             weapon.StartReload();
@@ -136,8 +130,8 @@ public static class PocWeaponDropVerification
         Check(typeof(PlayerInteractor).GetProperty("PickupClaimThisFrame") != null, "PlayerInteractor가 프레임 단위 줍기 예약을 노출한다");
         PlayerInteractor ctxInteractor = new GameObject("CtxInteractorProbe").AddComponent<PlayerInteractor>();
         WeaponPickup contextPickup = new GameObject("CtxPickupProbe").AddComponent<WeaponPickup>();
-        contextPickup.Initialize("bolt", "", 5);
-        ctxInteractor.CanPickup = _candidate => _candidate != null && _candidate.WeaponId == "bolt";
+        contextPickup.Initialize(new WeaponInstance("win1886", 5), "");
+        ctxInteractor.CanPickup = _candidate => _candidate != null && _candidate.WeaponId == "win1886";
         PlayerWeapon ctxProbe = new GameObject("CtxProbeHolder").AddComponent<PlayerWeapon>();
         SetPrivate(ctxProbe, "interactor", ctxInteractor);
         MethodInfo blocked = typeof(PlayerWeapon).GetMethod("ReloadBlockedByPickupInView", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -153,7 +147,7 @@ public static class PocWeaponDropVerification
         CheckPrefabs();
 
         Debug.Log($"{TAG} 편집 모드 검사 완료");
-        EditorApplication.Exit(Finish());
+        PocEditorExit.Exit(Finish());
     }
 
     private static void CheckBindings()
@@ -195,17 +189,23 @@ public static class PocWeaponDropVerification
         var catalog = AssetDatabase.LoadAssetAtPath<GameObject>(PocWeaponDropAuthoring.CATALOG_PREFAB_PATH);
         var catalogComponent = catalog != null ? catalog.GetComponent<WeaponPickupCatalog>() : null;
         Check(catalogComponent != null, "카탈로그 프리팹에 WeaponPickupCatalog가 있다");
-        foreach (string id in new[] { "revolver", "bolt", "smg" })
+        foreach (string id in PocWeaponDropAuthoring.MODEL_IDS)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(string.Format(PocWeaponDropAuthoring.PICKUP_PREFAB_FORMAT, id));
             var pickup = prefab != null ? prefab.GetComponent<WeaponPickup>() : null;
-            Check(pickup != null && pickup.WeaponId == id, $"픽업 프리팹 {id}의 무기 id 일치");
+            Check(pickup != null, $"픽업 프리팹 {id}가 있다");
             Check(prefab != null && prefab.layer == PICKUP_LAYER && prefab.GetComponentInChildren<MeshRenderer>() != null, $"픽업 프리팹 {id}는 상호작용 레이어에 보이는 모델을 가진다");
             Check(catalogComponent != null && catalogComponent.Find(id) != null, $"카탈로그가 {id} 픽업을 가진다");
         }
         var held = AssetDatabase.LoadAssetAtPath<GameObject>(PocWeaponDropAuthoring.HELD_PREFAB_PATH);
         var heldComponent = held != null ? held.GetComponent<WeaponHeldModels>() : null;
-        Check(heldComponent != null && held.transform.childCount == 3, "들고 있는 무기 프리팹은 세 모델을 가진다");
+        bool everyModel = heldComponent != null;
+        foreach (string id in PocWeaponDropAuthoring.MODEL_IDS)
+        {
+            everyModel &= heldComponent != null && heldComponent.Has(id);
+        }
+        Check(everyModel, "들고 있는 무기 프리팹은 외형마다 모델을 가진다");
+        Check(heldComponent != null && heldComponent.HasOffHand("revolver"), "아킴보 권총 외형은 왼손 모델도 가진다");
         Check(AssetDatabase.LoadAssetAtPath<InputActionReference>(PocWeaponDropAuthoring.INPUT_REF_PATH) != null, "Pickup 입력 참조 에셋이 있다");
     }
 
@@ -242,7 +242,7 @@ public static class PocWeaponDropVerification
                 EditorApplication.update -= tick;
                 SessionState.EraseBool(RUNNING);
                 EditorApplication.isPlaying = false;
-                EditorApplication.delayCall += () => EditorApplication.Exit(Finish());
+                EditorApplication.delayCall += () => PocEditorExit.Exit(Finish());
             }
         };
         return tick;
@@ -282,32 +282,36 @@ public static class PocWeaponDropVerification
         Check(!interactor.CanPickup(null), "상점 중 픽업 판정은 막힌다");
         Check(GetPrivate<string>(interactor, "lastPickupPrompt") == "", "상점 중 픽업 프롬프트가 비어 있다");
 
-        gm.Wallet.Add(1000);
-        var items = TableManager.Instance.Shop.items;
-        var bolt = items.First(_i => _i.id == "buy_bolt");
-        var smg = items.First(_i => _i.id == "buy_smg");
+        gm.Wallet.Add(5000);
         int moneyStart = gm.Wallet.Balance;
+        var shop = TableManager.Instance.Shop;
 
-        // 탄약 스냅샷: 리볼버를 2발 상태로 만들어 놓고 구매 낙하가 그 탄약을 들고 가는지 본다.
+        // 파츠는 사용 중인 같은 종류 무기에 즉시 붙고, 그 무기를 따라 바닥까지 간다.
+        Check(gm.TryBuyPart("m1873_heavy_barrel") == "" && gm.Parts.AttachedTo("m1873_heavy_barrel") == gm.Loadout.Active, "파츠 구매 시 사용 중인 M1873에 즉시 장착된다");
+        Check(Mathf.Approximately(weapon.Settings.damage, 36f), "무거운 총열이 사용 중 무기 피해에 반영된다");
+        Check(gm.TryBuyPart("m1873_heavy_barrel") == "" && gm.Parts.OwnedCount("m1873_heavy_barrel") == 2 && gm.Parts.StoredCount("m1873_heavy_barrel") == 1,
+            "같은 파츠를 다시 사면 새 개체가 생기고, 붙일 빈 칸이 없으면 보관된다(중복 보유)");
+        moneyStart = gm.Wallet.Balance;
+
+        // 빈 슬롯이 있으면 구매 무기는 빈 칸에 들어가고 사용 중 무기는 그대로다.
         SetAmmo(weapon, 2);
-        Check(gm.TryBuy(bolt) == "", "볼트액션 구매가 성공한다");
-        Check(gm.Loadout.IsEquipped("bolt") && gm.Loadout.IsOwned("revolver"), "구매 후 볼트액션을 들고 리볼버는 보유 기록으로 남는다");
-        Check(gm.Wallet.Balance == moneyStart - bolt.price, "구매 가격만큼만 소지금이 줄어든다");
-        Check(weapon.Ammo == 5, "새로 산 무기는 탄창을 가득 채운다");
+        Check(gm.TryBuyWeapon("win1886", 0) == "", "Winchester 1886 구매가 성공한다");
+        Check(gm.Loadout.Get(1)?.WeaponId == "win1886" && gm.Loadout.ActiveWeaponId == "m1873" && weapon.Ammo == 2, "빈 2번 슬롯에 들어가고 M1873을 계속 든다");
+        Check(gm.Loadout.Get(1).Magazine == 8 && GroundWeapons().Count == 0, "새 무기는 탄창이 가득 차 있고 바닥에 놓인 무기는 없다");
+        Check(gm.Wallet.Balance == moneyStart - ShopInfo.WeaponPrice(shop, "win1886"), "구매 가격만큼만 소지금이 줄어든다");
+        Check(gm.TryBuyWeapon("mp18", 0) != "", "다음 시대 무기는 아직 살 수 없다");
+
+        // 슬롯이 가득 차면 교체할 슬롯이 필요하다. 사용 중 슬롯을 교체하면 새 무기를 즉시 든다.
+        int before = gm.Wallet.Balance;
+        Check(gm.TryBuyWeapon("colt1878", -1) != "" && gm.Wallet.Balance == before, "슬롯이 가득 차면 교체 슬롯 없이 살 수 없다");
+        Check(gm.TryBuyWeapon("colt1878", 0) == "" && gm.Loadout.ActiveWeaponId == "colt1878" && weapon.Ammo == 6, "사용 중 슬롯 교체 시 새 무기를 즉시 든다");
         var ground = GroundWeapons();
-        Check(ground.Count == 1 && ground[0].WeaponId == "revolver" && ground[0].Ammo == 2, "이전 무기가 탄약 그대로 바닥에 떨어진다");
+        Check(ground.Count == 1 && ground[0].WeaponId == "m1873" && ground[0].Ammo == 2 && gm.Parts.AttachedTo("m1873_heavy_barrel") == ground[0].Weapon,
+            "교체된 M1873은 장전탄 2발과 파츠를 그대로 지닌 채 바닥에 놓인다");
+        Check(gm.TryBuyWeapon("colt1878", 1) == "" && gm.Loadout.Get(0).WeaponId == "colt1878" && gm.Loadout.Get(1).WeaponId == "colt1878" && gm.Loadout.ActiveIndex == 0,
+            "같은 무기를 두 자루 보유할 수 있고, 사용 중이 아닌 슬롯 교체는 현재 무기를 유지한다");
+        Check(GroundWeapons().Count == 2 && GroundWeapons().Any(_p => _p.WeaponId == "win1886" && _p.Ammo == 8), "교체된 Winchester 1886도 탄창 그대로 바닥에 놓인다");
 
-        // 실패 구매: 이미 획득한 무기는 다시 사거나 무료 장착할 수 없다. 돈·현재 무기·바닥 개수가 그대로여야 한다.
-        int groundBefore = GroundWeapons().Count;
-        Check(gm.TryBuy(bolt) != "" && gm.Loadout.IsEquipped("bolt"), "보유 무기 재구매는 거부되고 현재 무기는 그대로다");
-        Check(gm.Wallet.Balance == moneyStart - bolt.price && GroundWeapons().Count == groundBefore, "거부된 구매는 소지금과 바닥 무기를 바꾸지 않는다");
-
-        Check(gm.TryBuy(smg) == "", "기관단총 구매가 성공한다");
-        ground = GroundWeapons();
-        Check(ground.Count == 2 && ground.Any(_p => _p.WeaponId == "revolver") && ground.Any(_p => _p.WeaponId == "bolt" && _p.Ammo == 5), "두 번째 구매 후 바닥에 리볼버·볼트액션이 한 자루씩만 있다");
-        Check(weapon.Ammo == 30, "기관단총은 탄창을 가득 채워 든다");
-
-        // 픽업 게이트는 웨이브 중에만 열린다. 상점에서는 판정이 막혀 있어야 한다.
         gm.StartNextWave();
         frames = 0;
         while (gm.Phase != GameManager.GamePhase.Wave && frames++ < WAIT_LIMIT_FRAMES)
@@ -315,44 +319,34 @@ public static class PocWeaponDropVerification
             yield return null;
         }
         Check(gm.Phase == GameManager.GamePhase.Wave, "다음 웨이브가 시작된다");
+        Check(GroundWeapons().Count == 2, "바닥 무기는 웨이브가 지나도 남는다");
 
-        var revolverPickup = GroundWeapons().First(_p => _p.WeaponId == "revolver");
-        Check(interactor.CanPickup(revolverPickup), "웨이브 중 바닥 리볼버를 주울 수 있다");
-        // TryPickup은 지금 카메라 시선·거리를 다시 확인한다. 조준하지 않은 직접 호출은 거부되고 아무것도 바뀌지 않는다.
-        Aim(interactor, GroundWeapons().First(_p => _p.WeaponId == "bolt"));
-        Check(gm.TryPickup(revolverPickup) != "" && !revolverPickup.IsConsumed && gm.Loadout.IsEquipped("smg") && GroundWeapons().Count == 2,
-            "조준하지 않은 바닥 리볼버 직접 줍기는 거부되고 무기·바닥이 그대로다");
-        Check(interactor.CanPickup(revolverPickup) && !interactor.CanPickup(null), "픽업 게이트는 빈 대상을 거부한다");
-
-        // 재장전 중 줍기: 재장전은 취소되고 탄약은 이득 없이 그대로 간다.
+        // 전환: 진행 중 재장전은 취소되고 장전탄은 무기마다 남는다.
         SetAmmo(weapon, 1);
         weapon.StartReload();
         Check(weapon.IsReloading, "재장전을 시작한다");
-        Aim(interactor, revolverPickup);
-        Check(interactor.IsPickupInView(revolverPickup), "카메라를 바닥 리볼버에 조준한다");
-        Check(gm.TryPickup(revolverPickup) == "", "바닥 리볼버를 줍는다");
-        Check(gm.Loadout.IsEquipped("revolver") && weapon.Ammo == 2, "주운 리볼버는 놓였을 때 탄약 2발을 이어받는다");
-        Check(!weapon.IsReloading, "줍기 시 재장전은 취소된다");
-        // Destroy는 프레임 끝에 적용되므로 소비 결과는 한 프레임 뒤에 본다.
-        yield return null;
-        Check(revolverPickup == null, "주운 픽업은 한 번만 소비되어 사라진다");
-        Check(gm.TryPickup(revolverPickup) != "", "소비된 픽업은 다시 줍을 수 없다");
-        Check(!interactor.IsPickupInView(revolverPickup), "소비된 픽업은 시선 판정에서도 빠진다");
-        ground = GroundWeapons();
-        Check(ground.Count == 2 && ground.Any(_p => _p.WeaponId == "smg" && _p.Ammo == 1) && ground.Any(_p => _p.WeaponId == "bolt" && _p.Ammo == 5), "줍기 후 기관단총은 떨어진 순간의 탄약 1발 그대로 떨어지고 볼트액션은 그대로 있다");
+        Check(gm.SelectSlot(1) && !weapon.IsReloading && gm.Loadout.Get(0).Magazine == 1 && weapon.Ammo == 6, "슬롯 전환은 재장전을 취소하고 각 무기 장전탄을 유지한다");
+        Check(gm.SelectSlot(0) && weapon.Ammo == 1, "다시 전환하면 이전 무기 장전탄 그대로다");
 
-        // 바닥의 볼트액션을 주워 교환해도 탄약을 채워 주지 않는다(볼트 5발 그대로).
-        var boltPickup = GroundWeapons().First(_p => _p.WeaponId == "bolt");
-        Aim(interactor, boltPickup);
-        Check(gm.TryPickup(boltPickup) == "" && gm.Loadout.IsEquipped("bolt") && weapon.Ammo == 5, "볼트액션 줍기는 저장 탄약 5발을 그대로 잇는다");
-        Check(GroundWeapons().Count(_p => _p.WeaponId == "revolver") == 1 && GroundWeapons().Count(_p => _p.WeaponId == "smg") == 1, "교환 뒤에도 무기마다 바닥 한 자루씩만 있다");
+        // 가득 찬 슬롯에서 줍기: 사용 중 무기와 교환하고, 주운 무기는 장전탄·파츠를 유지한다.
+        var revolverPickup = GroundWeapons().First(_p => _p.WeaponId == "m1873");
+        Aim(interactor, GroundWeapons().First(_p => _p.WeaponId == "win1886"));
+        Check(gm.TryPickup(revolverPickup) != "" && !revolverPickup.IsConsumed, "조준하지 않은 바닥 무기 직접 줍기는 거부된다");
+        Aim(interactor, revolverPickup);
+        Check(interactor.IsPickupInView(revolverPickup) && gm.TryPickup(revolverPickup) == "", "바닥 M1873을 줍는다");
+        Check(gm.Loadout.ActiveWeaponId == "m1873" && weapon.Ammo == 2 && gm.Parts.AttachedTo("m1873_heavy_barrel") == gm.Loadout.Active, "주운 M1873은 장전탄 2발과 파츠를 유지한다");
+        Check(Mathf.Approximately(weapon.Settings.damage, 36f), "주운 무기의 파츠 효과가 다시 적용된다");
+        yield return null;
+        Check(revolverPickup == null && gm.TryPickup(revolverPickup) != "", "주운 픽업은 한 번만 소비된다");
+        ground = GroundWeapons();
+        Check(ground.Count == 2 && ground.Any(_p => _p.WeaponId == "colt1878" && _p.Ammo == 1) && ground.Any(_p => _p.WeaponId == "win1886"), "교환된 Colt 1878이 장전탄 1발로 바닥에 놓인다");
 
         // 바닥 정리: 사망 경로(ClearGroundWeapons)가 바닥 무기를 모두 치운다.
         InvokePrivate(gm, "ClearGroundWeapons");
         yield return null;
         Check(GroundWeapons().Count == 0, "사망 정리 후 바닥 무기가 남지 않는다");
 
-        Check(weapon != null && gm.Loadout.IsEquipped("bolt"), "사망 정리는 현재 든 무기를 바꾸지 않는다");
+        Check(weapon != null && gm.Loadout.ActiveWeaponId == "m1873", "사망 정리는 현재 든 무기를 바꾸지 않는다");
         Debug.Log($"{TAG} 플레이 검사 완료");
     }
 

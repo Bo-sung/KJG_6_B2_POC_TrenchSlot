@@ -13,6 +13,8 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
     [SerializeField] private PlayerWeapon weapon;
 
     private bool spinning;
+    // 마지막으로 회전을 시작한 웨이브 번호. 이월 저금통 판정용(0이면 아직 회전 없음).
+    private int lastSpinWave;
 
     private static SlotMachineData Table => TableManager.Instance.SlotMachine;
 
@@ -75,13 +77,18 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         int[] faces = RollFaces();
         SlotOutcome outcome = SlotMachineInfo.Evaluate(Table, faces);
         float seconds = gameManager.Perks.ApplySpinSeconds(SlotMachineInfo.SpinSeconds(Table));
-        bool started = reels.BeginSpin(faces, seconds, () => OnSpinStopped(outcome));
+        // 이월 저금통: 이번 웨이브 첫 회전이고 직전 웨이브에 한 번도 돌리지 않았을 때만.
+        int wave = gameManager.WaveNumber;
+        bool piggyEligible = wave > 1 && lastSpinWave < wave - 1;
+        float piggy = gameManager.Perks.PiggyBankMultiplier(piggyEligible);
+        bool started = reels.BeginSpin(faces, seconds, () => OnSpinStopped(outcome, piggy));
         if (!started)
         {
             gameManager.Wallet.Add(cost);
             return;
         }
 
+        lastSpinWave = wave;
         spinning = true;
         SpinStarted?.Invoke(cost);
     }
@@ -101,7 +108,7 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         return faces;
     }
 
-    private void OnSpinStopped(SlotOutcome _outcome)
+    private void OnSpinStopped(SlotOutcome _outcome, float _piggyMultiplier)
     {
         if (!spinning)
         {
@@ -123,7 +130,7 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
 
         if (_outcome.multiplier > 0)
         {
-            float bonus = 1f + gameManager.Perks.KillBonusPerKill * gameManager.KillsThisWave;
+            float bonus = (1f + gameManager.Perks.KillBonusPerKill * gameManager.KillsThisWave) * gameManager.Perks.PayoutMultiplier * _piggyMultiplier;
             payout = Mathf.FloorToInt(SlotMachineInfo.SpinCost(Table) * _outcome.multiplier * bonus);
             gameManager.Wallet.Add(payout);
             reels.PlayPayout(PAYOUT_PARTICLE_COUNT);
@@ -131,6 +138,10 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
             bool triple = _outcome.tripleFace >= 0;
             string name = SlotMachineInfo.SymbolName(Table, triple ? _outcome.tripleFace : _outcome.pairFace);
             text.Append($"{name} {(triple ? "3줄" : "2줄")} x{_outcome.multiplier}  +${payout:N0}");
+            if (_piggyMultiplier > 1f)
+            {
+                text.Append($"  (저금통 x{_piggyMultiplier:0.#})");
+            }
         }
         else if (_outcome.isNearMiss)
         {

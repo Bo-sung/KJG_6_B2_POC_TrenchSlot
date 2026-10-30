@@ -1,27 +1,29 @@
 using UnityEngine;
 
-// 바닥에 놓인 무기 한 자루. 무기 id와 놓일 당시 탄약 스냅샷을 가진다.
+// 바닥에 놓인 개별 무기 한 자루. 무기 객체(WeaponInstance)를 그대로 들고 있어 장전탄과 파츠가 유지된다.
 // 상호작용(E) 대상이 아니다. 픽업 키로만 주우며, 줍는 순간 한 번만 소비된다(GameManager.TryPickup 재검증).
+// 바닥 무기는 웨이브가 지나도 남고, 사망 시에만 치운다.
 public sealed class WeaponPickup : MonoBehaviour
 {
+    // 프리팹 기본 무기 id. 실제 무기는 Initialize로 받은 WeaponInstance가 정한다.
     [SerializeField] private string weaponId;
 
-    private int ammo;
+    private WeaponInstance weapon;
     private string displayName = "";
     private bool consumed;
 
-    public string WeaponId => weaponId;
+    public WeaponInstance Weapon => weapon;
+    public string WeaponId => weapon != null ? weapon.WeaponId : weaponId;
     public string DisplayName => displayName;
-    public int Ammo => ammo;
+    public int Ammo => weapon != null ? weapon.Magazine : 0;
 
     // 줍기에 소비되어 재사용 불가함을 뜻한다. 같은 프레임 연속 swap 중복 방지용.
     public bool IsConsumed => consumed;
 
-    public void Initialize(string _weaponId, string _displayName, int _ammo)
+    public void Initialize(WeaponInstance _weapon, string _displayName)
     {
-        weaponId = _weaponId;
+        weapon = _weapon;
         displayName = _displayName ?? "";
-        ammo = Mathf.Max(0, _ammo);
         consumed = false;
     }
 

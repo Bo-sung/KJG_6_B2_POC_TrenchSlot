@@ -60,7 +60,7 @@
           "initialStateCheck": false
         },
         {
-          "name": "Previous",
+          "name": "WeaponSlot1",
           "type": "Button",
           "id": "2776c80d-3c14-4091-8c56-d04ced07a2b0",
           "expectedControlType": "Button",
@@ -69,7 +69,7 @@
           "initialStateCheck": false
         },
         {
-          "name": "Next",
+          "name": "WeaponSlot2",
           "type": "Button",
           "id": "b7230bb6-fc9b-4f52-8b25-f5e19cb2c2ba",
           "expectedControlType": "Button",
@@ -344,7 +344,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Keyboard&Mouse",
-          "action": "Next",
+          "action": "WeaponSlot2",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -355,7 +355,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Gamepad",
-          "action": "Next",
+          "action": "WeaponSlot2",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -432,7 +432,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Keyboard&Mouse",
-          "action": "Previous",
+          "action": "WeaponSlot1",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -443,7 +443,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Gamepad",
-          "action": "Previous",
+          "action": "WeaponSlot1",
           "isComposite": false,
           "isPartOfComposite": false
         },

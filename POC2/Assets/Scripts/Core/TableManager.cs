@@ -17,6 +17,7 @@ public sealed class TableManager
     /// <summary>슬롯머신 당첨·가격 테이블. 로드 실패 시 빈 표이며 원인은 이미 로그로 남았다.</summary>
     public SlotMachineData SlotMachine { get; private set; }
     public WeaponData Weapon { get; private set; }
+    public PartData Part { get; private set; }
     public AmmoData Ammo { get; private set; }
     public EnemyData Enemy { get; private set; }
     public EnemyWeaponData EnemyWeapon { get; private set; }
@@ -38,6 +39,10 @@ public sealed class TableManager
         WeaponInfo.Validate(Weapon);
         WeaponInfo.ValidateAmmo(Weapon, Ammo);
 
+        Part = Load<PartData>(nameof(PartData));
+        PartInfo.Validate(Part);
+        PartInfo.ValidateWeapons(Part, Weapon);
+
         Enemy = Load<EnemyData>(nameof(EnemyData));
         EnemyInfo.Validate(Enemy);
 
@@ -52,12 +57,12 @@ public sealed class TableManager
         WaveInfo.Validate(Wave);
         WaveInfo.ValidateEnemyWeapons(Wave, EnemyWeapon);
 
-        Shop = Load<ShopData>(nameof(ShopData));
-        ShopInfo.Validate(Shop);
-        ShopInfo.ValidateAmmo(Shop, Ammo);
-
         Perk = Load<PerkData>(nameof(PerkData));
         PerkInfo.Validate(Perk);
+
+        Shop = Load<ShopData>(nameof(ShopData));
+        ShopInfo.Validate(Shop);
+        ShopInfo.ValidateReferences(Shop, Weapon, Ammo, Perk);
 
         GameConfig = Load<GameConfigData>(nameof(GameConfigData));
         GameConfigInfo.Validate(GameConfig);
