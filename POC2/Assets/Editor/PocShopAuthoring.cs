@@ -81,7 +81,16 @@ public static class PocShopAuthoring
 
         // 머리글: 제목·남은 정비 시간 / 소지금.
         var title = Text(root, "Title", "정비 시간", 34, MARGIN, -16f, 1200f, 48f, Color.white);
-        var intermission = Text(root, "Intermission", "", 22, MARGIN, -64f, 900f, 32f, MUTED_COLOR, false);
+        var intermission = Text(root, "Intermission", "", 22, MARGIN, -58f, 900f, 26f, MUTED_COLOR, false);
+        var barBg = PocAssetBuilder.Panel(root, "IntermissionBarBg", new Color(0.12f, 0.14f, 0.18f, 0.85f));
+        PocAssetBuilder.Place(barBg.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(MARGIN, -86f), new Vector2(500f, 10f));
+        var fillObject = PocAssetBuilder.UiObject("IntermissionFill", barBg.transform);
+        var fill = fillObject.AddComponent<Image>();
+        fill.color = new Color(0.96f, 0.68f, 0.22f);
+        fill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        PocAssetBuilder.Stretch(fill.rectTransform);
         var wallet = PocAssetBuilder.Label(root, "Wallet", "소지금", 34, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-MARGIN, -22f), new Vector2(600f, 50f));
         wallet.color = PRICE_COLOR;
         var scrolls = new System.Collections.Generic.List<ScrollRect>();
@@ -162,7 +171,7 @@ public static class PocShopAuthoring
         var supplySection = Region(root, "Supplies", "보급", RIGHT_X, -616f, RIGHT_WIDTH, 176f);
         float supplyWidth = (rightInner - SCROLLBAR_WIDTH - 4f - 8f) / 2f;
         var supplyList = ScrollList(supplySection, "SupplyList", PAD, -50f, rightInner, 114f, 2, 52f, 6f, scrolls, supplyWidth);
-        var supplyRows = new ShopRowView[shop.ammoPacks.Length + 1];
+        var supplyRows = new ShopRowView[shop.ammoPacks.Length];
         for (int i = 0; i < supplyRows.Length; i++)
         {
             supplyRows[i] = Row(supplyList, $"Supply{i}", 0f, 0f, supplyWidth, 52f, 17, 18, 80f);
@@ -189,6 +198,7 @@ public static class PocShopAuthoring
         so.FindProperty("titleText").objectReferenceValue = title;
         so.FindProperty("walletText").objectReferenceValue = wallet;
         so.FindProperty("intermissionText").objectReferenceValue = intermission;
+        so.FindProperty("intermissionFill").objectReferenceValue = fill;
         so.FindProperty("messageText").objectReferenceValue = message;
         so.FindProperty("userInfoText").objectReferenceValue = userInfo;
         so.FindProperty("inventoryText").objectReferenceValue = inventory;

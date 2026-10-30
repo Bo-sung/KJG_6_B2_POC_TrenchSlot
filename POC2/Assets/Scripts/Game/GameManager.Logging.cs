@@ -5,12 +5,14 @@ using UnityEngine;
 public sealed partial class GameManager
 {
     private LogGameLifecycle telemetry;
+    private LogGameplayEvents gameplayLog;
     private LogFixedTickCollector logFixedTicks;
     private LogCombatCollector logCombat;
     private bool loggingInitialized;
     private float? logDeathRadius;
 
     public LogGameLifecycle Telemetry => telemetry;
+    public LogGameplayEvents GameplayLog => gameplayLog;
 
     private void InitializeLogging()
     {
@@ -29,6 +31,7 @@ public sealed partial class GameManager
             }
             session = LogUnityAdapter.CreateSession();
             telemetry = new LogGameLifecycle(session);
+            gameplayLog = new LogGameplayEvents(telemetry);
             logFixedTicks = new LogFixedTickCollector(telemetry);
             logCombat = new LogCombatCollector(telemetry);
             telemetry.RegisterCollector(logCombat);

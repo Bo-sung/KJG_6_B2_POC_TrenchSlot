@@ -1,13 +1,17 @@
 {
   "spinCost": 10,
+  "spinHealAmount": 10,
   "missWeight": 0,
   "spinSeconds": 2.4,
+  "heldRewardChance": 0.7,
+  "missAmmoFraction": 1.0,
+  "fullAmmoCash": 5,
   "symbols": [
-    { "id": "rifle", "name": "소총", "reelIndex": 0, "weight": 208, "multiplier": 40, "pairMultiplier": 0 },
-    { "id": "helmet", "name": "철모", "reelIndex": 1, "weight": 417, "multiplier": 8, "pairMultiplier": 0 },
-    { "id": "shell", "name": "포탄", "reelIndex": 2, "weight": 625, "multiplier": 4, "pairMultiplier": 1 },
-    { "id": "dogtag", "name": "인식표", "reelIndex": 3, "weight": 937, "multiplier": 2, "pairMultiplier": 1 },
-    { "id": "ammo", "name": "탄약", "reelIndex": 4, "weight": 104, "multiplier": 0, "pairMultiplier": 0 },
-    { "id": "seven", "name": "7", "reelIndex": 5, "weight": 105, "multiplier": 50, "pairMultiplier": 0 }
+    { "id": "rifle", "name": "소총", "reelIndex": 0, "weight": 150, "multiplier": 20, "pairMultiplier": 0, "parts": 1 },
+    { "id": "helmet", "name": "철모", "reelIndex": 1, "weight": 300, "multiplier": 5, "pairMultiplier": 0, "parts": 1 },
+    { "id": "part", "name": "파츠", "reelIndex": 2, "weight": 500, "multiplier": 0, "pairMultiplier": 0, "parts": 1 },
+    { "id": "dogtag", "name": "인식표", "reelIndex": 3, "weight": 950, "multiplier": 1, "pairMultiplier": 1 },
+    { "id": "ammo", "name": "탄약상자", "reelIndex": 4, "weight": 350, "multiplier": 0, "pairMultiplier": 0, "fullAmmo": true },
+    { "id": "seven", "name": "7", "reelIndex": 5, "weight": 250, "multiplier": 25, "pairMultiplier": 0, "parts": 1, "nextEraParts": 1 }
   ]
 }

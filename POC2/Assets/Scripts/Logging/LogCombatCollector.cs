@@ -79,7 +79,8 @@ public sealed class LogCombatCollector : ILogWaveSummaryCollector, ILogWaveSumma
         });
     }
 
-    public LogShotContext StartShot(object _weapon, string _typeId, int _hand, LogPosition3 _origin, int _requestedProjectiles)
+    public LogShotContext StartShot(object _weapon, string _typeId, int _hand, LogPosition3 _origin, int _requestedProjectiles,
+        int? _magazine = null, int? _reserve = null, bool? _akimbo = null, bool? _aiming = null)
     {
         LogShotContext context = null;
         Observe(() =>
@@ -89,7 +90,7 @@ public sealed class LogCombatCollector : ILogWaveSummaryCollector, ILogWaveSumma
             string instanceId = session.GetWeaponId(_weapon);
             context = new LogShotContext(this, wave, session.NewId(LogIdKind.Shot), instanceId,
                 string.IsNullOrWhiteSpace(_typeId) ? "unknown" : _typeId, _hand == 0 ? "right" : "left",
-                session.WaveNumber, session.Phase, session.ElapsedSeconds, _origin, _requestedProjectiles);
+                session.WaveNumber, session.Phase, session.ElapsedSeconds, _origin, _requestedProjectiles, _magazine, _reserve, _akimbo, _aiming);
             if (wave != null)
             {
                 wave.pendingShots++;
@@ -143,6 +144,10 @@ public sealed class LogCombatCollector : ILogWaveSummaryCollector, ILogWaveSumma
                 weaponInstanceId = _shot.WeaponInstanceId,
                 weaponTypeId = _shot.WeaponTypeId,
                 hand = _shot.Hand,
+                magazineAmmo = _shot.MagazineAmmo,
+                reserveAmmo = _shot.ReserveAmmo,
+                akimbo = _shot.Akimbo,
+                aiming = _shot.Aiming,
                 origin = _shot.Origin,
                 originWaveNumber = _shot.OriginWaveNumber,
                 originPhase = _shot.OriginPhase,

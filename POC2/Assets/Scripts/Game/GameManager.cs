@@ -72,6 +72,15 @@ public sealed partial class GameManager : MonoBehaviour
     public WaveSpec CurrentWave => currentWave;
     public float WaveTimeLeft => waveTimeLeft;
     public float IntermissionLeft => intermissionLeft;
+    public float ShopDuration
+    {
+        get
+        {
+            var shop = TableManager.Instance.Shop;
+            float duration = ShopInfo.DurationSeconds(shop);
+            return duration > 0f ? duration : GameConfigInfo.IntermissionSeconds(TableManager.Instance.GameConfig);
+        }
+    }
     public int KillsThisWave => killsThisWave;
     public int TotalKills => totalKills;
     public PlayerWallet Wallet => wallet;
@@ -86,8 +95,6 @@ public sealed partial class GameManager : MonoBehaviour
     public bool IsAkimbo => loadout != null && loadout.Akimbo;
     // 지금 아킴보를 켤 수 있는지. 이미 켜져 있으면 false다.
     public bool CanAkimbo => !IsAkimbo && AkimboUnavailableReason == "";
-    // 지금 체력 회복을 살 수 있는지(살아 있고 최대 체력 미만). 상점 칸 활성 상태와 구매 판정이 같이 쓴다.
-    public bool CanHeal => playerHealth != null && playerHealth.IsAlive && ShopInfo.CanHeal(playerHealth.CurrentHealth, playerHealth.MaxHealth);
     public float CurrentHealth => playerHealth != null ? playerHealth.CurrentHealth : 0f;
     public float MaxHealth => playerHealth != null ? playerHealth.MaxHealth : 0f;
 
@@ -207,7 +214,7 @@ public sealed partial class GameManager : MonoBehaviour
             return;
         }
 
-        if (phase == GamePhase.Shop && GameConfigInfo.IntermissionSeconds(TableManager.Instance.GameConfig) > 0f)
+        if (phase == GamePhase.Shop && ShopDuration > 0f)
         {
             intermissionLeft = Mathf.Max(0f, intermissionLeft - Time.deltaTime);
             IntermissionChanged?.Invoke(intermissionLeft);
@@ -266,8 +273,9 @@ public sealed partial class GameManager : MonoBehaviour
         slotOffers.OnWaveEnded();
         ObserveLogging(() => telemetry.CompleteWave(CaptureLogPlayer(), enemiesBeforeCleanup, WaveBonusPaid, WaveHealthRestored));
         WaveEnded?.Invoke(currentWave.wave);
-        intermissionLeft = GameConfigInfo.IntermissionSeconds(config);
+        intermissionLeft = ShopDuration;
         SetPhase(GamePhase.Shop);
+        gameplayLog?.IntermissionStarted(intermissionLeft, wallet.Balance);
         IntermissionChanged?.Invoke(intermissionLeft);
     }
 
@@ -465,6 +473,14 @@ public sealed partial class GameManager : MonoBehaviour
     // 돈을 쓰기 전에 자리·프리팹을 모두 확인하므로, 실패하면 소지금과 슬롯이 그대로 남는다.
     public string TryBuyWeapon(string _weaponId, int _slot)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyWeapon(_weaponId, _slot);
+        gameplayLog?.ShopPurchase("Weapon", _weaponId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyWeapon(string _weaponId, int _slot)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -521,8 +537,11 @@ public sealed partial class GameManager : MonoBehaviour
         if (outgoing != null)
         {
             SpawnGroundWeapon(outgoing, spot);
+            gameplayLog?.WeaponDropped(outgoing.WeaponId, outgoing.Magazine, "Bought");
         }
-        loadout.Put(slot, NewWeapon(_weaponId));
+        WeaponInstance bought = NewWeapon(_weaponId);
+        loadout.Put(slot, bought);
+        gameplayLog?.WeaponAcquired("WeaponBought", _weaponId, slot, outgoing != null ? outgoing.WeaponId : "", bought.Magazine);
         if (replacingHeld)
         {
             ApplyActiveWeapon();
@@ -534,6 +553,14 @@ public sealed partial class GameManager : MonoBehaviour
     // 같은 종류 휴대 무기 중 그 칸이 빈 무기(사용 중 → 아킴보 왼손 → 나머지 순)에 바로 붙이고,
     // 빈 칸이 없으면 이 파츠가 없는 무기의 칸을 바꿔 끼운다(원래 파츠는 보관). 붙일 곳이 없거나 장전탄이 넘치면 보관한다.
     public string TryBuyPart(string _partId)
+    {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyPart(_partId);
+        gameplayLog?.ShopPurchase("Part", _partId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyPart(string _partId)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -776,6 +803,14 @@ public sealed partial class GameManager : MonoBehaviour
 
     public string TryBuyStat(string _statId)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyStat(_statId);
+        gameplayLog?.ShopPurchase("Stat", _statId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyStat(string _statId)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -798,6 +833,14 @@ public sealed partial class GameManager : MonoBehaviour
 
     public string TryBuyAmmo(string _ammoId)
     {
+        int balanceBefore = wallet.Balance;
+        string failure = BuyAmmo(_ammoId);
+        gameplayLog?.ShopPurchase("Ammo", _ammoId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuyAmmo(string _ammoId)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -810,27 +853,62 @@ public sealed partial class GameManager : MonoBehaviour
         return ammoShop.TryBuy(_ammoId);
     }
 
-    public string TryBuyHeal()
+    // 회전 결과의 현물 계획. 시대·해금은 회전이 시작된 웨이브(_spinWave) 기준이다. 실제 지급은 SlotRewardInfo.Apply가 한다.
+    public SlotRewardInfo.Reward PlanSlotReward(int _spinWave, SlotOutcome _outcome)
     {
-        string closed = ShopClosedReason();
-        if (closed != "")
+        var table = TableManager.Instance;
+        var context = new SlotRewardInfo.Context
         {
-            return closed;
-        }
-        if (!CanHeal)
+            wave = _spinWave,
+            shop = table.Shop,
+            weapons = table.Weapon,
+            parts = table.Part,
+            ammoTable = table.Ammo,
+            ammo = ammo,
+            carriedWeaponIds = CarriedWeaponIds(),
+        };
+        return SlotRewardInfo.Plan(table.SlotMachine, _outcome, context, () => UnityEngine.Random.value);
+    }
+
+    // 휴대 무기(슬롯 순서)의 무기 id. 바닥 무기와 빈 슬롯은 뺀다.
+    private List<string> CarriedWeaponIds()
+    {
+        var ids = new List<string>();
+        if (loadout == null)
         {
-            return "체력이 가득 차 있습니다.";
+            return ids;
         }
-        if (!wallet.TrySpend(ShopInfo.HealPrice(TableManager.Instance.Shop)))
+        for (int i = 0; i < loadout.SlotCount; i++)
         {
-            return "소지금이 부족합니다.";
+            var held = loadout.Get(i);
+            if (held != null)
+            {
+                ids.Add(held.WeaponId);
+            }
         }
-        playerHealth.Heal(GameConfigInfo.HealAmount(TableManager.Instance.GameConfig));
-        return "";
+        return ids;
+    }
+
+    // 슬롯 회전이 실제로 시작됐을 때만 호출한다. 이미 사망했으면 부활시키지 않는다.
+    public float RecoverForSlotSpin(float _amount)
+    {
+        if (playerHealth == null || !playerHealth.IsAlive || _amount <= 0f) return 0f;
+        float before = playerHealth.CurrentHealth;
+        playerHealth.Heal(_amount);
+        return playerHealth.CurrentHealth - before;
     }
 
     // 슬롯 업그레이드 진열 칸 구매. 산 칸은 다음 갱신까지 빈 칸으로 남는다.
     public string TryBuySlotUpgrade(int _offerIndex)
+    {
+        int balanceBefore = wallet.Balance;
+        string perkId = slotOffers.Get(_offerIndex);
+        string failure = BuySlotUpgrade(_offerIndex);
+        gameplayLog?.ShopPurchase("SlotUpgrade", perkId, failure, balanceBefore, wallet.Balance);
+        return failure;
+    }
+
+    private string BuySlotUpgrade(int _offerIndex)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -885,7 +963,9 @@ public sealed partial class GameManager : MonoBehaviour
         {
             weapon.CancelReload();
             SpawnGroundWeapon(outgoing, spot);
+            gameplayLog?.WeaponDropped(outgoing.WeaponId, outgoing.Magazine, "PickupSwap");
             loadout.Put(loadout.ActiveIndex, picked);
+            gameplayLog?.WeaponAcquired("WeaponPickedUp", picked.WeaponId, loadout.ActiveIndex, outgoing.WeaponId, picked.Magazine);
             ApplyActiveWeapon();
         }
         else
@@ -897,6 +977,7 @@ public sealed partial class GameManager : MonoBehaviour
                 weapon.CancelReload();
             }
             loadout.Put(empty, picked);
+            gameplayLog?.WeaponAcquired("WeaponPickedUp", picked.WeaponId, empty, "", picked.Magazine);
             if (wasAkimbo)
             {
                 ApplyActiveWeapon();

@@ -28,6 +28,8 @@ public static class PocAimVerification
         var awake = typeof(PlayerWeapon).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
         var updateAim = typeof(PlayerWeapon).GetMethod("UpdateAim", BindingFlags.Instance | BindingFlags.NonPublic);
         bool oldGate = InputGate.PlayerEnabled;
+        bool? aimEvent = null;
+        weapon.AimChanged += value => aimEvent = value;
         try
         {
             InputGate.PlayerEnabled = true;
@@ -40,9 +42,9 @@ public static class PocAimVerification
             weapon.Configure(main, settings, null, "colt45");
             updateAim.Invoke(weapon, new object[] { true, 1f });
             float expected = 60f * GameConfigInfo.AimFovRatio(TableManager.Instance.GameConfig);
-            Check(weapon.IsAiming && Mathf.Approximately(camera.fieldOfView, expected), "단일 무기 조준", ref failures);
+            Check(weapon.IsAiming && aimEvent == true && Mathf.Approximately(camera.fieldOfView, expected), "단일 무기 조준과 UI 이벤트", ref failures);
             updateAim.Invoke(weapon, new object[] { false, 1f });
-            Check(!weapon.IsAiming && Mathf.Approximately(camera.fieldOfView, 60f), "우클릭 해제", ref failures);
+            Check(!weapon.IsAiming && aimEvent == false && Mathf.Approximately(camera.fieldOfView, 60f), "우클릭 해제와 UI 이벤트", ref failures);
             updateAim.Invoke(weapon, new object[] { true, 1f });
             weapon.ConfigureAkimbo(main, settings, off, settings, null, "colt45", 1f);
             Check(!weapon.IsAiming && Mathf.Approximately(camera.fieldOfView, 60f), "아킴보 전환 시 해제", ref failures);

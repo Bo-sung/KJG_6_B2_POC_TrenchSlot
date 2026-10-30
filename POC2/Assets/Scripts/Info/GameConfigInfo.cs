@@ -7,8 +7,6 @@ public static class GameConfigInfo
 
     public static int StartMoney(GameConfigData _table) => _table != null ? _table.startMoney : 0;
 
-    public static int HealAmount(GameConfigData _table) => _table != null ? _table.healAmount : 0;
-
     public static int WaveClearHealAmount(GameConfigData _table) => _table != null ? Mathf.Max(0, _table.waveClearHealAmount) : 0;
 
     public static int WaveClearBonus(GameConfigData _table, int _wave)
@@ -36,6 +34,8 @@ public static class GameConfigInfo
     public static float DamageDirectionFadeSeconds(GameConfigData _table) => _table != null && _table.damageDirectionFadeSeconds > 0f ? _table.damageDirectionFadeSeconds : 0.8f;
     public static float AimFovRatio(GameConfigData _table) => _table != null && _table.aimFovRatio > 0f ? Mathf.Clamp(_table.aimFovRatio, 0.1f, 1f) : 0.7f;
     public static float AimTransitionSeconds(GameConfigData _table) => _table != null && _table.aimTransitionSeconds > 0f ? _table.aimTransitionSeconds : 0.15f;
+    public static float RecoilMaxPitchDegrees(GameConfigData _table) => _table != null && _table.recoilMaxPitchDegrees > 0f ? _table.recoilMaxPitchDegrees : 15f;
+    public static float RecoilMaxYawDegrees(GameConfigData _table) => _table != null && _table.recoilMaxYawDegrees > 0f ? _table.recoilMaxYawDegrees : 8f;
 
     public static void Validate(GameConfigData _table)
     {
@@ -56,9 +56,9 @@ public static class GameConfigInfo
         {
             Debug.LogError("조준 시야각 비율 또는 전환 시간이 올바르지 않습니다.");
         }
-        if (_table.startMoney < 0 || _table.healAmount < 0)
+        if (_table.startMoney < 0)
         {
-            Debug.LogError("startMoney 또는 healAmount가 음수입니다.");
+            Debug.LogError("startMoney가 음수입니다.");
         }
         if (_table.waveClearHealAmount < 0 || _table.waveClearBonusBase < 0 || _table.waveClearBonusPerWave < 0)
         {

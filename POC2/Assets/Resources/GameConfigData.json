@@ -1,11 +1,10 @@
 {
   "maxHealth": 100,
   "startMoney": 50,
-  "healAmount": 30,
   "waveClearHealAmount": 20,
   "waveClearBonusBase": 100,
   "waveClearBonusPerWave": 10,
-  "intermissionSeconds": 30,
+  "intermissionSeconds": 60,
   "interactDistance": 4,
   "weaponSlotCount": 2,
   "crouchHeightRatio": 0.55,
@@ -14,5 +13,7 @@
   "damageDirectionHoldSeconds": 0.2,
   "damageDirectionFadeSeconds": 0.8,
   "aimFovRatio": 0.7,
-  "aimTransitionSeconds": 0.15
+  "aimTransitionSeconds": 0.15,
+  "recoilMaxPitchDegrees": 15,
+  "recoilMaxYawDegrees": 8
 }

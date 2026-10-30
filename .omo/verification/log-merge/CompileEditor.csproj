@@ -1,0 +1,22 @@
+<Project>
+  <Import Project="../../../POC2/Assembly-CSharp-Editor.csproj" />
+  <PropertyGroup>
+    <OutputPath>bin/editor/</OutputPath>
+    <RunAnalyzers>false</RunAnalyzers>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="@(Compile)" />
+    <ProjectReference Remove="@(ProjectReference)" />
+    <Compile Include="../../../POC2/Assets/Scripts/**/*.cs" />
+    <Compile Include="../../../POC2/Assets/Editor/**/*.cs" />
+    <Compile Include="logkit-source/package/Runtime/**/*.cs" />
+    <Analyzer Remove="@(Analyzer)" />
+  </ItemGroup>
+  <Target Name="ResolveProjectRelativeReferences" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Update="@(Reference)" Condition="'%(Reference.HintPath)' != '' and !$([System.IO.Path]::IsPathRooted('%(Reference.HintPath)'))">
+        <HintPath>$(MSBuildThisFileDirectory)../../../POC2/%(Reference.HintPath)</HintPath>
+      </Reference>
+    </ItemGroup>
+  </Target>
+</Project>

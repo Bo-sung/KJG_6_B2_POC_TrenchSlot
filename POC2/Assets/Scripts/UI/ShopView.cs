@@ -14,6 +14,7 @@ public sealed class ShopView : MonoBehaviour
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private TMP_Text walletText;
     [SerializeField] private TMP_Text intermissionText;
+    [SerializeField] private Image intermissionFill;
     [SerializeField] private TMP_Text messageText;
     [SerializeField] private TMP_Text userInfoText;
     [SerializeField] private TMP_Text inventoryText;
@@ -205,7 +206,27 @@ public sealed class ShopView : MonoBehaviour
 
     public void SetIntermission(float _seconds)
     {
-        SetText(intermissionText, _seconds > 0f ? $"다음 웨이브까지 {Mathf.CeilToInt(_seconds)}초" : "");
+        SetIntermission(_seconds, 0f);
+    }
+
+    public void SetIntermission(float _seconds, float _total)
+    {
+        if (_seconds <= 0f)
+        {
+            SetText(intermissionText, "");
+            if (intermissionFill != null) intermissionFill.fillAmount = 0f;
+            return;
+        }
+        int sec = Mathf.CeilToInt(_seconds);
+        int m = sec / 60;
+        int s = sec % 60;
+        string timeStr = m > 0 ? $"{m:00}:{s:00}" : $"{sec}초";
+        SetText(intermissionText, $"정비 시간: {timeStr} (스킵 가능)");
+        if (intermissionFill != null)
+        {
+            float ratio = _total > 0f ? Mathf.Clamp01(_seconds / _total) : 1f;
+            intermissionFill.fillAmount = ratio;
+        }
     }
 
     public void SetMessage(string _message)

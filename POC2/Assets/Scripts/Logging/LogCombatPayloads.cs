@@ -36,6 +36,9 @@ public sealed class LogCombatImpact
     public string projectileId;
     public bool hitEnemy;
     public bool killed;
+    public bool headshot;
+    public bool helmetHit;
+    public bool staggered;
     public string targetId;
     public string enemyTypeId;
     public double actualDamage;
@@ -87,6 +90,10 @@ public sealed class LogShotContext
     internal bool hit;
     internal readonly string weaponKey;
 
+    public int? MagazineAmmo { get; }
+    public int? ReserveAmmo { get; }
+    public bool? Akimbo { get; }
+    public bool? Aiming { get; }
     public string ShotId { get; }
     public string WeaponInstanceId { get; }
     public string WeaponTypeId { get; }
@@ -101,8 +108,12 @@ public sealed class LogShotContext
 
     internal LogShotContext(LogCombatCollector _owner, LogCombatWaveState _wave, string _shotId,
         string _instanceId, string _typeId, string _hand, int? _waveNumber, string _phase,
-        double _elapsed, LogPosition3 _origin, int _requested)
+        double _elapsed, LogPosition3 _origin, int _requested, int? _magazine, int? _reserve, bool? _akimbo, bool? _aiming)
     {
+        MagazineAmmo = _magazine;
+        ReserveAmmo = _reserve;
+        Akimbo = _akimbo;
+        Aiming = _aiming;
         owner = _owner;
         wave = _wave;
         ShotId = _shotId;

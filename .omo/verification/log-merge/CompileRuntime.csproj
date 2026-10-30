@@ -1,0 +1,6 @@
+<Project>
+  <Import Project="../ammo-phase1/CompileRuntime.csproj" />
+  <ItemGroup>
+    <Compile Include="logkit-source/package/Runtime/**/*.cs" />
+  </ItemGroup>
+</Project>

@@ -195,8 +195,7 @@ public static class PocWaveRecoveryVerification
         {
             Check(game.SlotOffers.IsSoldOut(i) || UpgradeButton(i).interactable, $"slot upgrade offer {i} affordable after auto recovery");
         }
-        Check(game.CanHeal && HealButton().interactable,
-            "optional heal remains useful and affordable after partial auto recovery");
+        Check(!HasHealSupply(), "shop no longer sells health recovery");
         Check(ShopMessage().Contains("HP +20") && ShopMessage().Contains("+$100"),
             "shop MVP summary shows actual restored health and paid bonus");
         var hud = UnityEngine.Object.FindFirstObjectByType<HudView>();
@@ -206,8 +205,6 @@ public static class PocWaveRecoveryVerification
         Call(game, "EndWave");
         Check(game.Wallet.Balance == 150 && player.CurrentHealth == 45f && completionEvents == 1,
             "repeated completion grants neither health nor money nor event");
-        Check(game.TryBuyHeal() == "" && player.CurrentHealth == 75f && game.Wallet.Balance == 120,
-            "optional shop heal still costs 30 and restores 30 after automatic recovery");
 
         waves.enabled = false;
         game.StartNextWave();
@@ -219,10 +216,8 @@ public static class PocWaveRecoveryVerification
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "wave two timer reaches shop");
         Check(player.CurrentHealth == 100f && game.WaveHealthRestored == 0f && game.Wallet.Balance == before + 110,
             "wave two full health has zero overheal and exact 110 bonus");
-        Check(!game.CanHeal && !HealButton().interactable && ShopMessage().Contains("HP +0"),
-            "full-health recovery summary is zero and shop heal is disabled");
-        before = game.Wallet.Balance;
-        Check(game.TryBuyHeal() != "" && game.Wallet.Balance == before, "full-health optional heal cannot charge money");
+        Check(!HasHealSupply() && ShopMessage().Contains("HP +0"),
+            "full-health recovery summary is zero and shop has no heal item");
 
         game.StartNextWave();
         player.ApplyDamage(5f);
@@ -231,7 +226,7 @@ public static class PocWaveRecoveryVerification
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "near-max-health timer reaches shop");
         Check(player.CurrentHealth == 100f && game.WaveHealthRestored == 5f && game.Wallet.Balance == before + 120,
             "near-max health restores only missing 5 (95 to 100), not configured 20");
-        Check(ShopMessage().Contains("HP +5") && !HealButton().interactable,
+        Check(ShopMessage().Contains("HP +5") && !HasHealSupply(),
             "clipped recovery refreshes shop to full-health state with actual +5 summary");
 
         Call(game, "StartWave", 12);
@@ -248,14 +243,32 @@ public static class PocWaveRecoveryVerification
         Call(game, "StartWave", 13);
         var slot = UnityEngine.Object.FindFirstObjectByType<SlotMachinePresenter>();
         slot.SpinResolved += (_outcome, _paid, _text) => { spinEvents++; spinPayout = _paid; };
+        int healEvents = 0;
+        float lastHeal = 0f;
+        slot.SpinHealed += _amount => { healEvents++; lastHeal = _amount; };
+        player.ApplyDamage(20f);
+        float damagedHealth = player.CurrentHealth;
+        int savedBalance = game.Wallet.Balance;
+        game.Wallet.TrySpend(savedBalance);
+        slot.Interact();
+        Check(!slot.IsSpinning && player.CurrentHealth == damagedHealth && healEvents == 0, "insufficient funds do not start a spin or heal");
+        game.Wallet.Add(savedBalance);
         // Use real reels but deterministic winning symbols, so shop refresh after late payout is exercised.
         int seed = WinningSeed(slot);
         UnityEngine.Random.InitState(seed);
         int spinBalance = game.Wallet.Balance;
         int cost = slot.CurrentCost;
+        Action<int> reenterSpin = _balance => slot.Interact();
+        game.Wallet.BalanceChanged += reenterSpin;
         slot.Interact();
+        game.Wallet.BalanceChanged -= reenterSpin;
         Check(slot.IsSpinning && game.Wallet.Balance == spinBalance - cost && InputGate.PlayerEnabled,
             "real in-flight slot starts before timer expiry without input lock");
+        Check(player.CurrentHealth == damagedHealth + SlotMachineInfo.SpinHealAmount(TableManager.Instance.SlotMachine) && healEvents == 1 && lastHeal > 0f,
+            "successful spin heals once immediately and emits actual recovery");
+        slot.Interact();
+        Check(healEvents == 1 && game.Wallet.Balance == spinBalance - cost,
+            "repeat interaction during spin cannot heal or charge twice");
         Set(game, "waveTimeLeft", 0.001f);
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "in-flight slot survives real shop transition");
         Check(game.Wallet.Balance == spinBalance - cost + 220 && game.WaveBonusPaid == 220 && slot.IsSpinning,
@@ -266,6 +279,7 @@ public static class PocWaveRecoveryVerification
         yield return Wait(() => !slot.IsSpinning, 8f, "real reel animation completes in shop");
         Check(spinEvents == 1 && spinPayout > 0 && game.Wallet.Balance == 85 + spinPayout,
             "in-flight winning slot pays exactly once in shop (no completion duplication)");
+        Check(healEvents == 1, "reel completion does not heal a second time");
         Check(spinPayout < 5 || WeaponBuyButton("colt1878").interactable, "late wallet payout refreshes shop affordability");
         Check(ShopMessage().Contains("+$220"), "slot feedback does not erase shop completion summary");
 
@@ -328,11 +342,16 @@ public static class PocWaveRecoveryVerification
         return rows[_index].Button;
     }
 
-    // 보급 줄은 체력 회복이 맨 위다.
-    private static Button HealButton()
+    private static bool HasHealSupply()
     {
         var rows = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "supplyRows");
-        return rows[0].Button;
+        foreach (var row in rows)
+        {
+            if (row == null || !row.gameObject.activeSelf) continue;
+            var label = (TMP_Text)Get(row, "label");
+            if (label != null && (label.text.Contains("체력 회복") || label.text.Contains("응급 처치"))) return true;
+        }
+        return false;
     }
 
     private static string ShopMessage() => TextField(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "messageText").text;

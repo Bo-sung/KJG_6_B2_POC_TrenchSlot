@@ -28,6 +28,7 @@ public sealed class TableManager
     public GameConfigData GameConfig { get; private set; }
     public WeaponAimData WeaponAim { get; private set; }
     public LogData Log { get; private set; }
+    public TelemetryData Telemetry { get; private set; }
 
     private TableManager()
     {
@@ -76,6 +77,10 @@ public sealed class TableManager
             Log.enabled = false;
             Debug.LogError(logError);
         }
+
+        Telemetry = Load<TelemetryData>(nameof(TelemetryData));
+        TelemetryInfo.ApplyLocalOverride(Telemetry);
+        TelemetryInfo.Validate(Telemetry);
     }
 
     /// <summary>반복 호출해도 테이블을 다시 읽지 않는다.</summary>

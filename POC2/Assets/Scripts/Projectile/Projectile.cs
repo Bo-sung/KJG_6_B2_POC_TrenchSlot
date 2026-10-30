@@ -250,6 +250,9 @@ public sealed class Projectile : MonoBehaviour
             targetId = _targetId,
             enemyTypeId = _enemyTypeId,
             actualDamage = _actualEnemyDamage,
+            headshot = _combatResult.isHeadshot,
+            helmetHit = _combatResult.isHelmetHit,
+            staggered = _combatResult.staggered,
             point = new LogPosition3 { x = _hit.point.x, y = _hit.point.y, z = _hit.point.z }
         });
         Impacted?.Invoke(impact);
