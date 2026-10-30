@@ -82,7 +82,7 @@ public static class PocSceneBuilder
         var damageFlash = PocAssetBuilder.Panel(root, "DamageFlash", new Color(0.8f, 0.05f, 0.05f, 0f));
         damageFlash.raycastTarget = false;
 
-        PocAssetBuilder.Label(root, "Crosshair", "+", 48, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(80f, 80f));
+        var crosshair = PocAssetBuilder.Label(root, "Crosshair", "+", 48, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(80f, 80f));
         var hitObject = PocAssetBuilder.UiObject("HitMarker", root);
         var hitGroup = hitObject.AddComponent<CanvasGroup>();
         hitGroup.alpha = 0f;
@@ -101,8 +101,17 @@ public static class PocSceneBuilder
         fill.fillMethod = Image.FillMethod.Horizontal;
         PocAssetBuilder.Stretch(fill.rectTransform);
 
-        var wave = PocAssetBuilder.Label(root, "Wave", "WAVE 1", 44, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(800f, 60f));
-        var timer = PocAssetBuilder.Label(root, "Timer", "0초", 40, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(400f, 50f));
+        var wave = PocAssetBuilder.Label(root, "Wave", "WAVE 1", 44, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), new Vector2(800f, 54f));
+        var timerBarBg = PocAssetBuilder.Panel(root, "TimerBarBg", new Color(0.12f, 0.14f, 0.18f, 0.85f));
+        PocAssetBuilder.Place(timerBarBg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(460f, 14f));
+        var timerFillObject = PocAssetBuilder.UiObject("TimerFill", timerBarBg.transform);
+        var timerFill = timerFillObject.AddComponent<Image>();
+        timerFill.color = new Color(0.25f, 0.75f, 1f);
+        timerFill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        timerFill.type = Image.Type.Filled;
+        timerFill.fillMethod = Image.FillMethod.Horizontal;
+        PocAssetBuilder.Stretch(timerFill.rectTransform);
+        var timer = PocAssetBuilder.Label(root, "Timer", "0초", 28, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -118f), new Vector2(600f, 36f));
         var money = PocAssetBuilder.Label(root, "Money", "소지금", 40, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(600f, 50f));
         var kills = PocAssetBuilder.Label(root, "Kills", "처치 0", 32, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -100f), new Vector2(600f, 40f));
         var ammo = PocAssetBuilder.Label(root, "Ammo", "-- / --", 56, TextAlignmentOptions.Left, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(600f, 140f));
@@ -122,11 +131,13 @@ public static class PocSceneBuilder
         PocAssetBuilder.Place(resultObject.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(1200f, 80f));
 
         var so = new SerializedObject(view);
+        so.FindProperty("crosshair").objectReferenceValue = crosshair;
         so.FindProperty("healthText").objectReferenceValue = health;
         so.FindProperty("healthFill").objectReferenceValue = fill;
         so.FindProperty("moneyText").objectReferenceValue = money;
         so.FindProperty("waveText").objectReferenceValue = wave;
         so.FindProperty("timerText").objectReferenceValue = timer;
+        so.FindProperty("timerFill").objectReferenceValue = timerFill;
         so.FindProperty("ammoText").objectReferenceValue = ammo;
         so.FindProperty("killsText").objectReferenceValue = kills;
         so.FindProperty("promptText").objectReferenceValue = prompt;
@@ -152,59 +163,8 @@ public static class PocSceneBuilder
 
     private static void BuildShopPrefab()
     {
-        var canvas = PocAssetBuilder.CanvasRoot("Shop", 10);
-        var view = canvas.gameObject.AddComponent<ShopView>();
-        var root = canvas.transform;
-
-        var panel = PocAssetBuilder.Panel(root, "Panel", new Color(0.05f, 0.05f, 0.07f, 0.88f));
-        var title = PocAssetBuilder.Label(panel.transform, "Title", "정비 시간", 60, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(800f, 90f));
-        var wallet = PocAssetBuilder.Label(panel.transform, "Wallet", "소지금", 40, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-60f, -60f), new Vector2(600f, 50f));
-        var intermission = PocAssetBuilder.Label(panel.transform, "Intermission", "", 36, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -130f), new Vector2(800f, 50f));
-        var message = PocAssetBuilder.Label(panel.transform, "Message", "", 36, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -180f), new Vector2(1200f, 50f));
-        var ammoSummary = PocAssetBuilder.Label(panel.transform, "AmmoSummary", "보유 탄약", 30, TextAlignmentOptions.TopLeft, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(60f, -40f), new Vector2(420f, 400f));
-
-        var containerObject = PocAssetBuilder.UiObject("Slots", panel.transform);
-        PocAssetBuilder.Place(containerObject.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(180f, -40f), new Vector2(1200f, 610f));
-        var grid = containerObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(280f, 190f);
-        grid.spacing = new Vector2(20f, 20f);
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 4;
-        grid.childAlignment = TextAnchor.MiddleCenter;
-
-        TableManager.ReloadAfterTableEdit();
-        int slotCount = TableManager.Instance.Shop.items.Length;
-        var buttons = new Button[slotCount];
-        var labels = new TextMeshProUGUI[slotCount];
-        var prices = new TextMeshProUGUI[slotCount];
-        for (int i = 0; i < slotCount; i++)
-        {
-            var slot = PocAssetBuilder.UiObject($"Slot{i}", containerObject.transform);
-            var image = slot.AddComponent<Image>();
-            image.color = new Color(0.2f, 0.2f, 0.24f, 0.95f);
-            var button = slot.AddComponent<Button>();
-            button.targetGraphic = image;
-            buttons[i] = button;
-            labels[i] = PocAssetBuilder.Label(slot.transform, "Label", "", 26, TextAlignmentOptions.Top, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(260f, 128f));
-            prices[i] = PocAssetBuilder.Label(slot.transform, "Price", "", 32, TextAlignmentOptions.Bottom, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(260f, 40f));
-        }
-
-        var nextWave = PocAssetBuilder.MakeButton(panel.transform, "NextWave", "다음 웨이브", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-60f, 60f), new Vector2(360f, 90f));
-
-        var so = new SerializedObject(view);
-        so.FindProperty("panel").objectReferenceValue = panel.gameObject;
-        so.FindProperty("titleText").objectReferenceValue = title;
-        so.FindProperty("walletText").objectReferenceValue = wallet;
-        so.FindProperty("intermissionText").objectReferenceValue = intermission;
-        so.FindProperty("messageText").objectReferenceValue = message;
-        so.FindProperty("ammoSummaryText").objectReferenceValue = ammoSummary;
-        so.FindProperty("nextWaveButton").objectReferenceValue = nextWave;
-        AssignArray(so.FindProperty("slotButtons"), buttons);
-        AssignArray(so.FindProperty("slotLabels"), labels);
-        AssignArray(so.FindProperty("slotPrices"), prices);
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        PocAssetBuilder.SavePrefab(canvas.gameObject, $"{PocAssetBuilder.UI_PREFAB_DIR}/Shop.prefab");
+        // 구역형 상점(무기·파츠·스탯·보급·슬롯 업그레이드·유저 정보)은 PocShopAuthoring이 굽는다.
+        PocShopAuthoring.BuildShopPrefab();
     }
 
     private static void BuildGameOverPrefab()

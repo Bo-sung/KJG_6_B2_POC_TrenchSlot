@@ -24,6 +24,20 @@ public sealed class EnemyData
         public float projectileRadius;
         // 처치 시 지급 소지금.
         public int reward;
+        // 전투(provisional, 플레이테스트 후 결정). 적용은 Enemy가 한다.
+        // 헤드샷 피해 배율, 헬멧 착용과 머리 피해 감소율(머리 피해가 몸통보다 낮아지지 않도록 전투 쪽이 제한).
+        public float headshotMultiplier = 1.5f;
+        public bool hasHelmet;
+        public float helmetDamageReduction;
+        // 저지력 저항 기준(누적치가 넘으면 경직), 초당 감소량, 경직 시간, 경직 후 면역 시간.
+        public float stoppingResistance;
+        public float stoppingDecayRate;
+        public float staggerDuration;
+        public float staggerImmunityDuration;
+        // 넉백 저항(0~1). 중장일수록 높다.
+        public float knockbackResistance;
+        // 머리 판정 영역: 몸 콜라이더 높이 대비 이 비율 이상에 맞으면 머리(헬멧 착용 시 헬멧)다. EnemyHitbox가 붙은 콜라이더는 그 지정을 우선한다.
+        public float headHeightRatio = 0.72f;
     }
 
     public Entry[] enemies = Array.Empty<Entry>();

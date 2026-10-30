@@ -416,6 +416,6 @@ public static class PocCoverVerification
     {
         SessionState.SetBool(RUNNING, false);
         Debug.Log($"{TAG} finished real play-mode frames={Time.frameCount}, passes={passes}, failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 }

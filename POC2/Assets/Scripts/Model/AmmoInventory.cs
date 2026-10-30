@@ -14,6 +14,8 @@ public sealed class AmmoInventory
     // 탄종 ID, 현재 예비탄, 현재 최대량. 실제 상태가 변할 때만 알린다.
     public event Action<string, int, int> Changed;
 
+    public LogAmmoCollector AmmoLog { get; set; }
+
     public AmmoInventory(AmmoData _table)
     {
         if (_table == null || _table.ammoTypes == null)
@@ -46,9 +48,9 @@ public sealed class AmmoInventory
         return _id != null && stocks.TryGetValue(_id, out var stock) ? stock.maximum : 0;
     }
 
-    public int Add(string _id, int _amount)
+    public int Add(string _id, int _amount, string _source = "unknown", string _causeId = null)
     {
-        if (_amount <= 0 || _id == null || !stocks.TryGetValue(_id, out var stock))
+        if (_amount < 0 || _id == null || !stocks.TryGetValue(_id, out var stock))
         {
             return 0;
         }
@@ -56,6 +58,11 @@ public sealed class AmmoInventory
         if (added > 0)
         {
             stock.reserve += added;
+        }
+        AmmoLog?.Change(new LogAmmoChange { source = _source, causeId = _causeId,
+            ammoTypeId = _id, reserveDelta = added, acquired = _source == "capacity_return" ? 0 : added });
+        if (added > 0)
+        {
             Changed?.Invoke(_id, stock.reserve, stock.maximum);
         }
         return added;
@@ -77,7 +84,7 @@ public sealed class AmmoInventory
     }
 
     // 초과분 폐기 여부는 호출자가 명시한다. false일 때 현재량보다 낮추는 요청은 상태 변경 없이 거절한다.
-    public bool SetMaximum(string _id, int _maximum, bool _discardExcess)
+    public bool SetMaximum(string _id, int _maximum, bool _discardExcess, string _causeId = null)
     {
         if (_maximum < 0 || _id == null || !stocks.TryGetValue(_id, out var stock) ||
             (!_discardExcess && stock.reserve > _maximum))
@@ -88,8 +95,13 @@ public sealed class AmmoInventory
         {
             return true;
         }
+        int previousMaximum = stock.maximum;
+        int previousReserve = stock.reserve;
         stock.maximum = _maximum;
         stock.reserve = Math.Min(stock.reserve, _maximum);
+        AmmoLog?.Change(new LogAmmoChange { source = "maximum_changed", ammoTypeId = _id, causeId = _causeId,
+            reserveDelta = stock.reserve - previousReserve, discarded = previousReserve - stock.reserve,
+            reserveMaximumBefore = previousMaximum, reserveMaximumAfter = stock.maximum });
         Changed?.Invoke(_id, stock.reserve, stock.maximum);
         return true;
     }

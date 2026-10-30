@@ -90,7 +90,7 @@ public static class PocVerification
         SessionState.SetString(MODE_KEY, "");
         EditorApplication.update -= InputTick;
         EditorApplication.isPlaying = false;
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     private static void CheckInputState()
@@ -130,42 +130,54 @@ public static class PocVerification
         Check(slotTable.symbols.Length == 6, "slot symbol count is 6");
         Check(SlotMachineInfo.SpinCost(slotTable) == 10, "spin cost base 10");
         int total = SlotMachineInfo.TotalWeight(slotTable, 1);
-        Check(total == 2396, $"six weights sum to 2396 (got {total})");
-        Check(SlotMachineInfo.PickFace(slotTable, 0, 1) == 0, "roll 0 maps to rifle (reel 0)");
-        Check(SlotMachineInfo.PickFace(slotTable, 207, 1) == 0, "roll 207 still rifle");
-        Check(SlotMachineInfo.PickFace(slotTable, 208, 1) == 1, "roll 208 maps to helmet (reel 1)");
-        Check(SlotMachineInfo.PickFace(slotTable, 2395, 1) == 5, "last roll maps to seven (reel 5)");
-        Check(SlotMachineInfo.TotalWeight(slotTable, 3) == 2396 + 104 * 2, "ammo weight scale x3 raises ammo weight only");
+        Check(total == 2500, $"v4 six weights sum to 2500 (got {total})");
+        Check(SlotMachineInfo.PickFace(slotTable, 0, 1) == 0 && SlotMachineInfo.PickFace(slotTable, 149, 1) == 0, "rifle owns rolls 0..149 (150/2500)");
+        Check(SlotMachineInfo.PickFace(slotTable, 150, 1) == 1, "roll 150 maps to helmet (reel 1)");
+        // 가중치 구간은 JSON 순서(소총·철모·파츠·인식표·탄약·7)로 쌓인다.
+        Check(SlotMachineInfo.PickFace(slotTable, 450, 1) == 2 && SlotMachineInfo.PickFace(slotTable, 949, 1) == 2, "part owns rolls 450..949 (500)");
+        Check(SlotMachineInfo.PickFace(slotTable, 1900, 1) == 4 && SlotMachineInfo.PickFace(slotTable, 2249, 1) == 4, "ammo owns rolls 1900..2249 (350)");
+        Check(SlotMachineInfo.PickFace(slotTable, 2250, 1) == 5 && SlotMachineInfo.PickFace(slotTable, 2499, 1) == 5, "seven owns rolls 2250..2499 (250)");
+        Check(SlotMachineInfo.TotalWeight(slotTable, 3) == 2500 + 350 * 2, "ammo weight scale x3 raises ammo weight only (3200)");
 
         var triple = SlotMachineInfo.Evaluate(slotTable, new[] { 0, 0, 0 });
-        Check(triple.tripleFace == 0 && triple.multiplier == 40, "rifle x3 pays x40");
-        var pair = SlotMachineInfo.Evaluate(slotTable, new[] { 2, 2, 5 });
-        Check(pair.pairFace == 2 && pair.multiplier == 1 && pair.tripleFace < 0, "shell x2 pays x1");
+        Check(triple.tripleFace == 0 && triple.multiplier == 20 && triple.partCount == 1 && triple.nextEraPartCount == 0 && !triple.hasAmmo && !triple.isMiss,
+            "rifle x3 pays $200 (x20) + one current-era part");
+        var helmet = SlotMachineInfo.Evaluate(slotTable, new[] { 1, 1, 1 });
+        Check(helmet.multiplier == 5 && helmet.partCount == 1, "helmet x3 pays $50 + one part");
+        var dogtagTriple = SlotMachineInfo.Evaluate(slotTable, new[] { 3, 3, 3 });
+        Check(dogtagTriple.multiplier == 1 && dogtagTriple.partCount == 0, "dogtag triple pays $10 and never a part");
+        var pair = SlotMachineInfo.Evaluate(slotTable, new[] { 3, 3, 5 });
+        Check(pair.pairFace == 3 && pair.multiplier == 1 && pair.tripleFace < 0 && !pair.isMiss, "dogtag pair pays $10");
         var near = SlotMachineInfo.Evaluate(slotTable, new[] { 0, 0, 1 });
-        Check(near.pairFace == 0 && near.multiplier == 0 && near.isNearMiss, "rifle pair without pay is near miss");
+        Check(near.pairFace == 0 && near.multiplier == 0 && near.isNearMiss && near.isMiss, "rifle pair without pay is near miss and a miss");
         var ammo = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 1, 3 });
-        Check(ammo.hasAmmo && ammo.multiplier == 0, "ammo on one reel refills, no pay");
+        Check(!ammo.hasAmmo && ammo.isMiss, "single ammo on one reel is not a refill (triple only)");
+        var ammoTriple = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 4, 4 });
+        Check(ammoTriple.hasAmmo && ammoTriple.multiplier == 0 && ammoTriple.partCount == 0 && !ammoTriple.isMiss, "ammo triple refills, no cash multiplier");
+        var ammoPair = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 4, 0 });
+        Check(!ammoPair.hasAmmo && ammoPair.multiplier == 0 && ammoPair.isMiss, "ammo pair gives no bonus at all");
         var none = SlotMachineInfo.Evaluate(slotTable, new[] { 1, 2, 3 });
-        Check(none.multiplier == 0 && !none.hasAmmo && none.pairFace < 0 && !none.isNearMiss, "all different is a plain miss");
+        Check(none.multiplier == 0 && !none.hasAmmo && none.pairFace < 0 && !none.isNearMiss && none.isMiss, "all different is a plain miss");
         var seven = SlotMachineInfo.Evaluate(slotTable, new[] { 5, 5, 5 });
-        Check(seven.multiplier == 50, "seven x3 pays x50");
+        Check(seven.multiplier == 25 && seven.partCount == 1 && seven.nextEraPartCount == 1, "seven x3 pays $250 + current + next-era part");
 
         double analytic = AnalyticRtp(slotTable);
-        Check(Math.Abs(analytic - 0.6941) < 0.001, $"analytic RTP ~0.694 with independent reels (got {analytic:0.0000})");
+        Check(Math.Abs(analytic - 0.3614) < 0.0005, $"analytic cash RTP ~0.361 multiplier (v4 weights, got {analytic:0.0000})");
         double simulated = SimulateRtp(slotTable, MONTE_CARLO_SPINS);
         Check(Math.Abs(simulated - analytic) < RTP_TOLERANCE, $"simulated RTP {simulated:0.0000} matches analytic {analytic:0.0000}");
 
         var perks = new PerkInventory(table.Perk);
         Check(perks.ApplySpinCost(10) == 10, "no discount keeps cost 10");
+        // 슬롯 업그레이드는 런당 각 1회(상점-세부설계 §6).
         perks.Buy(PerkInventory.DISCOUNT_LEVER);
-        Check(perks.ApplySpinCost(10) == 8, "discount 1 stack -> 8");
+        Check(perks.ApplySpinCost(10) == 8 && !perks.CanBuy(PerkInventory.DISCOUNT_LEVER), "discount 1 stack -> 8, once per run");
         perks.Buy(PerkInventory.DISCOUNT_LEVER);
-        Check(perks.ApplySpinCost(10) == 6 && !perks.CanBuy(PerkInventory.DISCOUNT_LEVER), "discount 2 stacks -> 6, capped");
+        Check(perks.ApplySpinCost(10) == 8, "extra discount purchase is ignored");
         perks.Buy(PerkInventory.FAST_SPINDLE);
         Check(Math.Abs(perks.ApplySpinSeconds(2.4f) - 1.68f) < 0.001f, "fast spindle -30% of 2.4s = 1.68s");
         perks.Buy(PerkInventory.KILL_STACK);
         perks.Buy(PerkInventory.KILL_STACK);
-        Check(Math.Abs(perks.KillBonusPerKill - 0.04f) < 0.0001f, "kill stack x2 -> +4% per kill");
+        Check(Math.Abs(perks.KillBonusPerKill - 0.02f) < 0.0001f, "kill stack once per run -> +2% per kill");
         perks.Buy(PerkInventory.AMMO_SYMBOL);
         Check(perks.AmmoWeightScale == 3, "ammo symbol perk weight x3");
 
@@ -174,14 +186,18 @@ public static class PocVerification
         Check(w1.enemyWeapon == "musket", "wave 1 ranged enemies carry muskets");
         var w3 = WaveInfo.Resolve(table.Wave, 3);
         Check(w3.enemyWeapon == "musket" && w3.era == "MUSKET", "wave 3 still muskets");
-        var w4 = WaveInfo.Resolve(table.Wave, 4);
-        Check(w4.enemyWeapon == "wwi_rifle" && w4.era == "WWI", "wave 4 switches to WWI rifles");
+        // 시대 구간: 1~5 MUSKET(1887) · 6~10 WWI · 11~15 WWII, 이후 WWII 무한(상점-세부설계 §2).
+        var w5 = WaveInfo.Resolve(table.Wave, 5);
+        Check(w5.enemyWeapon == "musket" && w5.era == "MUSKET", "wave 5 still muskets");
+        var w4 = WaveInfo.Resolve(table.Wave, 6);
+        Check(w4.enemyWeapon == "wwi_rifle" && w4.era == "WWI", "wave 6 switches to WWI rifles");
         var w9 = WaveInfo.Resolve(table.Wave, 9);
         Check(w9.enemyWeapon == "wwi_rifle" && w9.era == "WWI", "wave 9 still WWI rifles");
-        var w10 = WaveInfo.Resolve(table.Wave, 10);
-        Check(w10.heavies == 1 && w10.era == "WWII" && w10.enemyWeapon == "wwii_rifle", "wave 10 introduces heavy and WWII rifles");
-        var w13 = WaveInfo.Resolve(table.Wave, 13);
-        Check(w13.rushers == 10 && w13.riflemen == 8 && w13.heavies == 3 && Math.Abs(w13.hpMultiplier - 1.1f) < 0.0001f, "wave 13 scales beyond table");
+        Check(WaveInfo.Resolve(table.Wave, 10).heavies == 1 && WaveInfo.Resolve(table.Wave, 10).era == "WWI", "wave 10 introduces heavy in WWI");
+        var w10 = WaveInfo.Resolve(table.Wave, 11);
+        Check(w10.era == "WWII" && w10.enemyWeapon == "wwii_rifle", "wave 11 switches to WWII rifles");
+        var w13 = WaveInfo.Resolve(table.Wave, 16);
+        Check(w13.rushers == 11 && w13.riflemen == 10 && w13.heavies == 4 && w13.era == "WWII" && Math.Abs(w13.hpMultiplier - 1.1f) < 0.0001f, "wave 16 scales beyond table as WWII infinite");
         Check(w13.enemyWeapon == "wwii_rifle", "scaled wave 13 keeps WWII rifles");
 
         var enemyWeapons = table.EnemyWeapon;
@@ -189,12 +205,12 @@ public static class PocVerification
         var rusherStats = EnemyInfo.Find(table.Enemy, EnemyInfo.RUSHER_ID);
         var riflemanStats = EnemyInfo.Find(table.Enemy, EnemyInfo.RIFLEMAN_ID);
         var heavyStats = EnemyInfo.Find(table.Enemy, EnemyInfo.HEAVY_ID);
-        Check(EnemyWeaponInfo.ForEnemy(rusherStats, enemyWeapons, w10.enemyWeapon) == null, "rusher never gets a gun, even in wave 10");
+        Check(EnemyWeaponInfo.ForEnemy(rusherStats, enemyWeapons, w10.enemyWeapon) == null, "rusher never gets a gun, even in wave 11");
         Check(EnemyWeaponInfo.ForEnemy(rusherStats, enemyWeapons, w1.enemyWeapon) == null, "rusher never gets a gun, even in wave 1");
         var riflemanWeapon = EnemyWeaponInfo.ForEnemy(riflemanStats, enemyWeapons, w1.enemyWeapon);
         Check(riflemanWeapon != null && riflemanWeapon.id == "musket", "wave 1 rifleman resolves to musket");
         var heavyWeapon = EnemyWeaponInfo.ForEnemy(heavyStats, enemyWeapons, w10.enemyWeapon);
-        Check(heavyWeapon != null && heavyWeapon.id == "wwii_rifle", "wave 10 heavy resolves to WWII rifle");
+        Check(heavyWeapon != null && heavyWeapon.id == "wwii_rifle", "wave 11 heavy resolves to WWII rifle");
         Check(EnemyWeaponInfo.ForEnemy(riflemanStats, enemyWeapons, "") == null, "ranged enemy without a wave weapon stays unarmed");
 
         var enemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PocAssetBuilder.GAMEPLAY_PREFAB_DIR}/Enemy.prefab");
@@ -208,6 +224,11 @@ public static class PocVerification
         var meleeRusher = UnityEngine.Object.Instantiate(enemyPrefab).GetComponent<Enemy>();
         meleeRusher.Configure(rusherStats, heavyWeapon, 1f, Color.gray, null);
         Check(meleeRusher.WeaponId == "" && ActiveGunModel(meleeRusher.transform.Find("WeaponMount")) == "", "melee rusher ignores a weapon even when one is passed");
+        var stick = meleeRusher.transform.Find("MeleeWeapon");
+        var rangedStick = armedRifle.transform.Find("MeleeWeapon");
+        Check(stick != null && stick.gameObject.activeSelf && stick.GetComponentInChildren<Collider>(true) == null,
+            "melee rusher holds a visible wooden club without an extra collider");
+        Check(rangedStick != null && !rangedStick.gameObject.activeSelf, "ranged enemies do not show the club");
 
         armedRifle.TakeDamage(1f);
         Check(armedRifle.IsFlashing && !armedRifle.IsDead, "non-lethal hit starts the hit flash");
@@ -223,21 +244,15 @@ public static class PocVerification
         Check(wallet.TrySpend(10) && wallet.Balance == 40, "spend 10 from 50");
         Check(!wallet.TrySpend(100) && wallet.Balance == 40, "cannot overspend");
 
-        var loadout = new WeaponLoadout("revolver");
-        loadout.Own("bolt");
-        Check(loadout.Equip("bolt") && loadout.EquippedId == "bolt", "owned weapon equips freely");
-        Check(!loadout.Equip("smg") && loadout.EquippedId == "bolt", "unowned weapon cannot equip");
-
-        Check(table.Shop.items.Length == 11, "shop has seven existing items and four ammo items");
         Check(table.GameConfig.maxHealth == 100 && table.GameConfig.startMoney == 50, "game config loaded");
-        Check(table.Weapon.weapons.Length == 3 && WeaponInfo.StartWeaponId(table.Weapon) == "revolver", "three weapons, revolver starts");
         var startRevolver = WeaponInfo.Find(table.Weapon, WeaponInfo.StartWeaponId(table.Weapon));
-        Check(startRevolver != null && startRevolver.id == "revolver" && startRevolver.magazineSize == 6, "player starts with six-round revolver (table)");
-        var startLoadout = new WeaponLoadout(WeaponInfo.StartWeaponId(table.Weapon));
-        Check(startLoadout.EquippedId == "revolver" && startLoadout.IsOwned("revolver") && !startLoadout.IsOwned("bolt"), "player starts equipped with revolver only");
+        Check(startRevolver != null && startRevolver.id == "m1873" && startRevolver.magazineSize == 6, "player starts with six-round Colt SAA M1873 (table)");
+        // 상점·무기 슬롯·파츠 모델 검사는 에디터를 종료하지 않는 PocShopVerification에 있다.
+        failures += PocShopVerification.RunModelChecks();
+        failures += PocSlotRewardVerification.RunModelChecks();
 
         Debug.Log($"{TAG} unit checks finished: failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     // 켜진 총 모델 이름. 정확히 하나만 켜져 있을 때만 그 이름을 주고, 아니면 빈 문자열.
@@ -335,10 +350,9 @@ public static class PocVerification
         }
         Check(typeof(PlayerWeapon).GetEvent("EnemyHit") != null, "PlayerWeapon exposes EnemyHit confirmed-hit event");
         Check(typeof(PlayerWeapon).GetProperty("ReloadProgress") != null, "PlayerWeapon exposes ReloadProgress");
-        Check(ShopInfo.CanHeal(20f, 100f) && !ShopInfo.CanHeal(100f, 100f) && !ShopInfo.CanHeal(0f, 0f), "heal item buyable only below max health");
 
         Debug.Log($"{TAG} feedback finished: failures={failures}");
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     private static void CheckSerializedRefs(SerializedObject _so, string _owner, string[] _fields)
@@ -449,8 +463,8 @@ public static class PocVerification
                 Check(gm.Phase == GameManager.GamePhase.Wave && gm.WaveNumber == 1, "wave 1 starts automatically");
                 Check(waves.AliveCount > 0 || !waves.AllSpawned, "enemies spawn during wave 1");
                 Check(weapon.MagazineSize == 6 && weapon.Ammo == 6, $"player starts with six-round revolver in scene (ammo {weapon.Ammo}/{weapon.MagazineSize})");
-                Check(weapon.AmmoId == "pistol" && weapon.ReserveAmmo == 36,
-                    "starting revolver uses pistol reserve separately from its loaded magazine");
+                Check(weapon.AmmoId == "colt45" && weapon.ReserveAmmo == 36,
+                    "starting revolver uses .45 Colt reserve separately from its loaded magazine");
                 foreach (var ammoEntry in TableManager.Instance.Ammo.ammoTypes)
                 {
                     Check(gm.Ammo.GetReserve(ammoEntry.id) == ammoEntry.startingReserve &&
@@ -523,17 +537,17 @@ public static class PocVerification
             case 4:
                 gm.Wallet.Add(500);
                 int before = gm.Wallet.Balance;
-                string failure = BuyFirst(TableManager.Instance.Shop, "bolt");
+                string failure = gm.TryBuyWeapon("win1886", -1);
                 Check(failure == "", $"shop purchase succeeds with funds (message='{failure}')");
-                Check(gm.Loadout.IsOwned("bolt") && gm.Loadout.IsEquipped("bolt"), "bolt owned and equipped after purchase");
-                Check(gm.Wallet.Balance == before - 150, "bolt costs 150");
-                string broke = BuyFirst(TableManager.Instance.Shop, "smg");
-                Check(broke == "" || broke == "소지금이 부족합니다.", $"smg purchase handled (message='{broke}')");
+                Check(gm.Loadout.Get(1)?.WeaponId == "win1886" && gm.Loadout.ActiveWeaponId == "m1873", "purchase fills empty slot 2 and keeps current weapon");
+                Check(gm.Wallet.Balance == before - ShopInfo.WeaponPrice(TableManager.Instance.Shop, "win1886"), "win1886 costs table price");
+                string locked = gm.TryBuyWeapon("mp18", 0);
+                Check(locked != "", $"WW1 weapon is locked in 1887 era (message='{locked}')");
                 Next();
                 return;
 
             case 5:
-                if (elapsed < 31d)
+                if (elapsed < (double)gm.ShopDuration + 1d)
                 {
                     return;
                 }
@@ -589,7 +603,7 @@ public static class PocVerification
         SessionState.SetString(MODE_KEY, "");
         EditorApplication.update -= FlowTick;
         EditorApplication.isPlaying = false;
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 
     private static void ClickButton(string _name)
@@ -661,7 +675,7 @@ public static class PocVerification
                 SessionState.SetString(MODE_KEY, "");
                 EditorApplication.update -= ShotTick;
                 EditorApplication.isPlaying = false;
-                EditorApplication.Exit(0);
+                PocEditorExit.Exit(0);
                 return;
         }
         shotStep++;
@@ -691,18 +705,6 @@ public static class PocVerification
         Debug.Log($"{TAG} killed {enemies.Length} enemies");
     }
 
-    private static string BuyFirst(ShopData _shop, string _weaponTarget)
-    {
-        foreach (var item in _shop.items)
-        {
-            if (item.type == ShopInfo.TYPE_WEAPON && item.target == _weaponTarget)
-            {
-                return gm.TryBuy(item);
-            }
-        }
-        return "항목 없음";
-    }
-
     private static void FinishSmoke()
     {
         Debug.Log($"{TAG} smoke finished: failures={failures}");
@@ -710,6 +712,6 @@ public static class PocVerification
         EditorApplication.update -= SmokeTick;
         EditorApplication.update -= FlowTick;
         EditorApplication.isPlaying = false;
-        EditorApplication.Exit(failures == 0 ? 0 : 1);
+        PocEditorExit.Exit(failures == 0 ? 0 : 1);
     }
 }

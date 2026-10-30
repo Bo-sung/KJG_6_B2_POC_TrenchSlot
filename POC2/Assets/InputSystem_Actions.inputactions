@@ -33,6 +33,15 @@
           "initialStateCheck": false
         },
         {
+          "name": "Aim",
+          "type": "Button",
+          "id": "b2d3d3bf-1cbc-4520-a57e-c57152259ac2",
+          "expectedControlType": "Button",
+          "processors": "",
+          "interactions": "",
+          "initialStateCheck": false
+        },
+        {
           "name": "Interact",
           "type": "Button",
           "id": "852140f2-7766-474d-8707-702459ba45f3",
@@ -60,7 +69,7 @@
           "initialStateCheck": false
         },
         {
-          "name": "Previous",
+          "name": "WeaponSlot1",
           "type": "Button",
           "id": "2776c80d-3c14-4091-8c56-d04ced07a2b0",
           "expectedControlType": "Button",
@@ -69,7 +78,7 @@
           "initialStateCheck": false
         },
         {
-          "name": "Next",
+          "name": "WeaponSlot2",
           "type": "Button",
           "id": "b7230bb6-fc9b-4f52-8b25-f5e19cb2c2ba",
           "expectedControlType": "Button",
@@ -106,6 +115,17 @@
         }
       ],
       "bindings": [
+        {
+          "name": "",
+          "id": "11b1647d-8e52-4b53-a646-738d775f6f48",
+          "path": "<Mouse>/rightButton",
+          "interactions": "",
+          "processors": "",
+          "groups": ";Keyboard&Mouse",
+          "action": "Aim",
+          "isComposite": false,
+          "isPartOfComposite": false
+        },
         {
           "name": "",
           "id": "978bfe49-cc26-4a3d-ab7b-7d7a29327403",
@@ -344,7 +364,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Keyboard&Mouse",
-          "action": "Next",
+          "action": "WeaponSlot2",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -355,7 +375,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Gamepad",
-          "action": "Next",
+          "action": "WeaponSlot2",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -432,7 +452,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Keyboard&Mouse",
-          "action": "Previous",
+          "action": "WeaponSlot1",
           "isComposite": false,
           "isPartOfComposite": false
         },
@@ -443,7 +463,7 @@
           "interactions": "",
           "processors": "",
           "groups": "Gamepad",
-          "action": "Previous",
+          "action": "WeaponSlot1",
           "isComposite": false,
           "isPartOfComposite": false
         },

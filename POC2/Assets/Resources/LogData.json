@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "schemaVersion": 1,
+  "deathEnemyRadius": 10.0,
+  "flushIntervalSeconds": 2.0,
+  "maxBufferedRecords": 256,
+  "maxBufferedBytes": 1048576,
+  "maxRecordBytes": 65536,
+  "maxWarningsPerSession": 3
+}

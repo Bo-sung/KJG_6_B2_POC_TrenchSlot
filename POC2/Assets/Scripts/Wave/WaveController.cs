@@ -16,6 +16,7 @@ public sealed class WaveController : MonoBehaviour
 
     private readonly List<Enemy> alive = new List<Enemy>();
     private readonly Queue<string> pending = new Queue<string>();
+    private readonly LogEnemyPopulation logPopulation = new LogEnemyPopulation();
     private EnemyData enemyTable;
     private EnemyWeaponData enemyWeaponTable;
     private string enemyWeaponId;
@@ -36,9 +37,42 @@ public sealed class WaveController : MonoBehaviour
     public event Action<Enemy> EnemyKilled;
     public event Action Cleared;
 
+    public LogEnemySnapshot CaptureAliveSnapshot(Vector3? _center, float? _radius, IEnumerable<string> _plannedKinds)
+    {
+        bool hasRadius = _radius.HasValue && _radius.Value > 0f &&
+            !float.IsNaN(_radius.Value) && !float.IsInfinity(_radius.Value);
+        LogEnemySnapshot snapshot = logPopulation.CreateSnapshot(_plannedKinds,
+            hasRadius ? _radius.Value : (double?)null, _center.HasValue);
+        foreach (var enemy in alive)
+        {
+            if (enemy == null || enemy.IsDead)
+            {
+                continue;
+            }
+            bool? nearby = snapshot.nearbyAliveCount.HasValue
+                ? Vector3.Distance(enemy.transform.position, _center.Value) <= _radius.Value : (bool?)null;
+            logPopulation.AddAlive(snapshot, enemy.KindId, nearby);
+        }
+        return snapshot;
+    }
+
     public void Begin(WaveSpec _spec, EnemyData _enemyTable, EnemyWeaponData _enemyWeaponTable, PlayerHealth _target)
     {
         Stop();
+        var plannedKinds = new List<string>();
+        if (_spec.rushers > 0)
+        {
+            plannedKinds.Add(EnemyInfo.RUSHER_ID);
+        }
+        if (_spec.riflemen > 0)
+        {
+            plannedKinds.Add(EnemyInfo.RIFLEMAN_ID);
+        }
+        if (_spec.heavies > 0)
+        {
+            plannedKinds.Add(EnemyInfo.HEAVY_ID);
+        }
+        logPopulation.Reset(plannedKinds);
         enemyTable = _enemyTable;
         enemyWeaponTable = _enemyWeaponTable;
         enemyWeaponId = _spec.enemyWeapon;
@@ -158,6 +192,7 @@ public sealed class WaveController : MonoBehaviour
         enemy.Configure(stats, weapon, hpMultiplier, color, target);
         enemy.Died += OnEnemyDied;
         alive.Add(enemy);
+        logPopulation.ObserveKind(enemy.KindId);
         return true;
     }
 

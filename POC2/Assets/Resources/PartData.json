@@ -1,0 +1,15 @@
+{
+  "status": "provisional",
+  "note": "POC 파츠 범위는 1887 3종(상점-세부설계 §4). 수치는 임시. 조준경·반동형 파츠는 보류.",
+  "parts": [
+    { "id": "m1873_nickel", "weaponId": "m1873", "slot": "muzzle", "name": "니켈 도금", "description": "5% 확률로 탄 소비 없음", "damageMultiplier": 1.0, "fireRateMultiplier": 1.0, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0.05 },
+    { "id": "m1873_heavy_barrel", "weaponId": "m1873", "slot": "barrel", "name": "무거운 총열", "description": "피해 +20%, 연사 -15%", "damageMultiplier": 1.2, "fireRateMultiplier": 0.85, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0 },
+    { "id": "m1873_fast_cylinder", "weaponId": "m1873", "slot": "magazine", "name": "빠른 실린더", "description": "재장전 시간 -25%", "damageMultiplier": 1.0, "fireRateMultiplier": 1.0, "magazineBonus": 0, "reloadMultiplier": 0.75, "ammoSaveChance": 0 },
+    { "id": "win1886_long_barrel", "weaponId": "win1886", "slot": "barrel", "name": "연장 총열", "description": "피해 +15%", "damageMultiplier": 1.15, "fireRateMultiplier": 1.0, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0 },
+    { "id": "win1886_long_tube", "weaponId": "win1886", "slot": "magazine", "name": "연장 탄창 튜브", "description": "탄창 +3", "damageMultiplier": 1.0, "fireRateMultiplier": 1.0, "magazineBonus": 3, "reloadMultiplier": 1.0, "ammoSaveChance": 0 },
+    { "id": "win1886_lever_grip", "weaponId": "win1886", "slot": "stock", "name": "레버 그립", "description": "연사 +15%", "damageMultiplier": 1.0, "fireRateMultiplier": 1.15, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0 },
+    { "id": "colt1878_nickel", "weaponId": "colt1878", "slot": "muzzle", "name": "니켈 도금", "description": "5% 확률로 탄 소비 없음", "damageMultiplier": 1.0, "fireRateMultiplier": 1.0, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0.05 },
+    { "id": "colt1878_short_barrel", "weaponId": "colt1878", "slot": "barrel", "name": "짧은 총열", "description": "연사 +20%, 피해 -15%", "damageMultiplier": 0.85, "fireRateMultiplier": 1.2, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0 },
+    { "id": "colt1878_ivory_grip", "weaponId": "colt1878", "slot": "stock", "name": "상아 그립", "description": "연사 +10%", "damageMultiplier": 1.0, "fireRateMultiplier": 1.1, "magazineBonus": 0, "reloadMultiplier": 1.0, "ammoSaveChance": 0 }
+  ]
+}

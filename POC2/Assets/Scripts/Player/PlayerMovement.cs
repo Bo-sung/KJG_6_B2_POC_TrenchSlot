@@ -22,10 +22,17 @@ public sealed class PlayerMovement : MonoBehaviour
     private Vector3 standingCenter;
     private Vector3 standingViewPosition;
     private float cameraVelocity;
+    private float recoilPitch;
+    private float recoilYaw;
+    private float recoilRecovery;
     private GameConfigData feedbackConfig;
 
     public bool IsCrouched { get; private set; }
-    public float CurrentMoveSpeed => moveSpeed * (IsCrouched ? GameConfigInfo.CrouchSpeedRatio(feedbackConfig) : 1f);
+    public bool IsControlEnabled => isActiveAndEnabled && controller != null && controller.enabled &&
+        InputGate.PlayerEnabled && (health == null || health.IsAlive);
+    // 이동속도 배율(이동속도 스탯 × 든 무기 무게). GameManager가 정한다.
+    public float SpeedMultiplier { get; set; } = 1f;
+    public float CurrentMoveSpeed => moveSpeed * Mathf.Max(0f, SpeedMultiplier) * (IsCrouched ? GameConfigInfo.CrouchSpeedRatio(feedbackConfig) : 1f);
 
     private void Awake()
     {
@@ -52,6 +59,7 @@ public sealed class PlayerMovement : MonoBehaviour
 
     private void OnDisable()
     {
+        ResetRecoil();
         moveAction?.action?.Disable();
         lookAction?.action?.Disable();
         crouchAction?.action?.Disable();
@@ -64,8 +72,11 @@ public sealed class PlayerMovement : MonoBehaviour
         // 정비 상점·게임 오버 중에는 이동·시점 조작을 멈춘다. 슬롯 회전 중에는 막지 않는다.
         if ((health != null && !health.IsAlive) || !InputGate.PlayerEnabled)
         {
+            ResetRecoil();
             return;
         }
+
+        TickRecoil(Time.deltaTime);
 
         if (viewPivot != null && lookAction != null && lookAction.action != null)
         {
@@ -76,8 +87,8 @@ public sealed class PlayerMovement : MonoBehaviour
             Vector2 look = action.ReadValue<Vector2>() * scale;
             transform.Rotate(Vector3.up * look.x);
             pitch = Mathf.Clamp(pitch - look.y, -pitchLimit, pitchLimit);
-            viewPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
         }
+        ApplyViewRotation();
 
         Vector2 input = moveAction != null && moveAction.action != null
             ? Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f)
@@ -91,6 +102,39 @@ public sealed class PlayerMovement : MonoBehaviour
         Vector3 velocity = (transform.right * input.x + transform.forward * input.y) * CurrentMoveSpeed;
         velocity.y = verticalSpeed;
         controller.Move(velocity * Time.deltaTime);
+    }
+
+    // 반동은 마우스 입력과 분리된 일시적 시점 오프셋이다. 발사마다 누적되고 자연히 0으로 돌아간다.
+    public void AddRecoil(float _pitch, float _yaw, float _recoveryPerSecond)
+    {
+        if (viewPivot == null || !InputGate.PlayerEnabled || (health != null && !health.IsAlive)) return;
+        float maxPitch = GameConfigInfo.RecoilMaxPitchDegrees(feedbackConfig);
+        float maxYaw = GameConfigInfo.RecoilMaxYawDegrees(feedbackConfig);
+        recoilPitch = Mathf.Clamp(recoilPitch - Mathf.Max(0f, _pitch), -maxPitch, 0f);
+        recoilYaw = Mathf.Clamp(recoilYaw + _yaw, -maxYaw, maxYaw);
+        recoilRecovery = Mathf.Max(0f, _recoveryPerSecond);
+        ApplyViewRotation();
+    }
+
+    public void TickRecoil(float _deltaTime)
+    {
+        float step = recoilRecovery * Mathf.Max(0f, _deltaTime);
+        recoilPitch = Mathf.MoveTowards(recoilPitch, 0f, step);
+        recoilYaw = Mathf.MoveTowards(recoilYaw, 0f, step);
+        ApplyViewRotation();
+    }
+
+    private void ResetRecoil()
+    {
+        recoilPitch = 0f;
+        recoilYaw = 0f;
+        ApplyViewRotation();
+    }
+
+    private void ApplyViewRotation()
+    {
+        if (viewPivot != null)
+            viewPivot.localRotation = Quaternion.Euler(Mathf.Clamp(pitch + recoilPitch, -pitchLimit, pitchLimit), recoilYaw, 0f);
     }
 
     // Same capsule and view path is used by input and deterministic physics verification.

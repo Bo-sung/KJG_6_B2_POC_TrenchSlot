@@ -11,9 +11,13 @@ public sealed class HudView : MonoBehaviour
     private const float LOW_HEALTH_RATIO = 0.3f;
     private const string HIT_TEXT = "X";
     private const string KILL_TEXT = "처치";
+    private const string HEAD_TEXT = "헤드샷";
+    private const string HELMET_TEXT = "헬멧";
     private const string EMPTY_PROMPT = "빈 탄창 · R 재장전";
     private static readonly Color HIT_COLOR = Color.white;
     private static readonly Color KILL_COLOR = new Color(1f, 0.25f, 0.2f);
+    private static readonly Color HEAD_COLOR = new Color(1f, 0.85f, 0.2f);
+    private static readonly Color HELMET_COLOR = new Color(0.6f, 0.75f, 0.9f);
     private static readonly Color LOW_HEALTH_COLOR = new Color(1f, 0.55f, 0.1f);
     private static readonly Color EMPTY_AMMO_COLOR = new Color(1f, 0.3f, 0.25f);
 
@@ -22,9 +26,11 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private TMP_Text moneyText;
     [SerializeField] private TMP_Text waveText;
     [SerializeField] private TMP_Text timerText;
+    [SerializeField] private Image timerFill;
     [SerializeField] private TMP_Text ammoText;
     [SerializeField] private TMP_Text killsText;
     [SerializeField] private TMP_Text promptText;
+    [SerializeField] private TMP_Text crosshair;
     [SerializeField] private TMP_Text bannerText;
     [SerializeField] private CanvasGroup bannerGroup;
     [SerializeField] private TMP_Text resultText;
@@ -50,6 +56,11 @@ public sealed class HudView : MonoBehaviour
 
     private void Awake()
     {
+        if (crosshair == null)
+        {
+            var existing = transform.Find("Crosshair");
+            if (existing != null) crosshair = existing.GetComponent<TMP_Text>();
+        }
         healthBaseColor = healthFill.color;
         ammoBaseColor = ammoText.color;
         ammoText.verticalAlignment = VerticalAlignmentOptions.Bottom;
@@ -62,6 +73,11 @@ public sealed class HudView : MonoBehaviour
             hitMarkerGroup.alpha = 0f;
         }
         SetDamageDirection(0f, 0f);
+    }
+
+    public void SetCrosshairVisible(bool _visible)
+    {
+        if (crosshair != null) crosshair.enabled = _visible;
     }
 
     public void SetDamageDirection(float _bearingDegrees, float _alpha)
@@ -95,27 +111,56 @@ public sealed class HudView : MonoBehaviour
 
     public void SetTimer(float _left)
     {
-        timerText.text = $"{Mathf.CeilToInt(_left)}초";
+        SetTimer(_left, 0f, "");
     }
 
-    public void SetAmmo(int _ammo, int _reserve, bool _reloading, float _reloadProgress)
+    public void SetTimer(float _left, float _total, string _status = "")
+    {
+        int seconds = Mathf.CeilToInt(_left);
+        int m = seconds / 60;
+        int s = seconds % 60;
+        string timeStr = m > 0 ? $"{m:00}:{s:00}" : $"{seconds}초";
+        if (timerText != null)
+        {
+            timerText.text = string.IsNullOrEmpty(_status) ? timeStr : $"{_status} · {timeStr}";
+        }
+        if (timerFill != null)
+        {
+            float ratio = _total > 0f ? Mathf.Clamp01(_left / _total) : (_left > 0f ? 1f : 0f);
+            timerFill.fillAmount = ratio;
+        }
+    }
+
+    // _weaponLabel은 휴대 슬롯 요약(사용 중 슬롯 강조)이다. 비어 있으면 생략한다.
+    public void SetAmmo(int _ammo, int _reserve, bool _reloading, float _reloadProgress, string _weaponLabel = "")
     {
         string count = $"{_ammo} / {_reserve}";
+        string weaponLine = string.IsNullOrEmpty(_weaponLabel) ? "" : $"<size=45%>{_weaponLabel}</size>\n";
         if (_reloading)
         {
-            ammoText.text = $"<size=60%>재장전 {Mathf.FloorToInt(Mathf.Clamp01(_reloadProgress) * 100f)}%</size>\n{count}";
+            ammoText.text = $"{weaponLine}<size=60%>재장전 {Mathf.FloorToInt(Mathf.Clamp01(_reloadProgress) * 100f)}%</size>\n{count}";
             ammoText.color = ammoBaseColor;
             return;
         }
         bool empty = _ammo <= 0;
         string status = _reserve <= 0 ? "예비탄 없음" : (empty ? EMPTY_PROMPT : " ");
-        ammoText.text = $"<size=60%>{status}</size>\n{count}";
+        ammoText.text = $"{weaponLine}<size=60%>{status}</size>\n{count}";
         ammoText.color = empty || _reserve <= 0 ? EMPTY_AMMO_COLOR : ammoBaseColor;
     }
 
     public void SetKills(int _kills)
     {
         killsText.text = $"처치 {_kills}";
+    }
+
+    // 정비 상점처럼 전체 화면 UI가 열려 있을 때 HUD를 숨긴다.
+    public void SetVisible(bool _visible)
+    {
+        var canvas = GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.enabled = _visible;
+        }
     }
 
     public void SetPrompt(string _prompt)
@@ -147,8 +192,16 @@ public sealed class HudView : MonoBehaviour
     // 확정 적중 표시. 처치면 빨간 "처치", 아니면 흰 X. 호출은 PlayerWeapon.EnemyHit(실제 적 피해)에서만 온다.
     public void ShowHitMarker(bool _killed)
     {
-        hitMarkerText.text = _killed ? KILL_TEXT : HIT_TEXT;
-        hitMarkerText.color = _killed ? KILL_COLOR : HIT_COLOR;
+        ShowHitMarker(_killed, false, false);
+    }
+
+    // 머리·헬멧 명중을 구분해 보인다. 헬멧 명중은 헤드샷보다 우선 표시한다(피해 감소를 알린다).
+    public void ShowHitMarker(bool _killed, bool _headshot, bool _helmet)
+    {
+        string zone = _helmet ? HELMET_TEXT : (_headshot ? HEAD_TEXT : "");
+        string main = _killed ? KILL_TEXT : HIT_TEXT;
+        hitMarkerText.text = zone == "" ? main : $"{main}\n<size=60%>{zone}</size>";
+        hitMarkerText.color = _killed ? KILL_COLOR : (_helmet ? HELMET_COLOR : (_headshot ? HEAD_COLOR : HIT_COLOR));
         if (hitMarkerRoutine != null)
         {
             StopCoroutine(hitMarkerRoutine);

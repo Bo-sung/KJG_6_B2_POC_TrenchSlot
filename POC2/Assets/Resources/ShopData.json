@@ -1,15 +1,54 @@
 {
-  "items": [
-    { "id": "buy_bolt", "type": "weapon", "target": "bolt", "label": "볼트액션 소총", "price": 150 },
-    { "id": "buy_smg", "type": "weapon", "target": "smg", "label": "기관단총", "price": 150 },
-    { "id": "heal", "type": "heal", "target": "", "label": "응급 처치", "price": 30 },
-    { "id": "perk_discount", "type": "perk", "target": "discountLever", "label": "할인 레버", "price": 120 },
-    { "id": "perk_kill", "type": "perk", "target": "killStack", "label": "킬 스택", "price": 100 },
-    { "id": "perk_spindle", "type": "perk", "target": "fastSpindle", "label": "고속 스핀들", "price": 120 },
-    { "id": "perk_ammo", "type": "perk", "target": "ammoSymbol", "label": "탄약 심볼", "price": 100 },
-    { "id": "ammo_pistol", "type": "ammo", "target": "pistol", "label": "권총 탄약 보충", "price": 200 },
-    { "id": "ammo_sniper", "type": "ammo", "target": "sniper", "label": "저격 탄약 보충", "price": 200 },
-    { "id": "ammo_smg", "type": "ammo", "target": "smg", "label": "기관단총 탄약 보충", "price": 200 },
-    { "id": "ammo_shotgun", "type": "ammo", "target": "shotgun", "label": "샷건 탄약 보충", "price": 200 }
-  ]
+  "status": "provisional",
+  "note": "가격과 탄약 전량 보급 $50은 잠정값(기존 상세기획 $200에서 초반 경제성 개선을 위해 $50으로 인하). 상점 기본 시간 60초(스킵 가능). 슬롯 v4에 맞춘다.",
+  "durationSeconds": 60,
+  "priceRounding": 5,
+  "eras": [
+    { "id": "1887", "name": "1887 서부", "startWave": 1 },
+    { "id": "WW1", "name": "제1차 세계대전", "startWave": 6 },
+    { "id": "WW2", "name": "제2차 세계대전", "startWave": 11 }
+  ],
+  "weapons": [
+    { "weaponId": "m1873", "price": 60 },
+    { "weaponId": "win1886", "price": 140 },
+    { "weaponId": "colt1878", "price": 90 },
+    { "weaponId": "p08", "price": 200 },
+    { "weaponId": "smle", "price": 300 },
+    { "weaponId": "mp18", "price": 450 },
+    { "weaponId": "m1897", "price": 380 },
+    { "weaponId": "thompson", "price": 750 },
+    { "weaponId": "mosin", "price": 600 },
+    { "weaponId": "mg42", "price": 900 },
+    { "weaponId": "m12", "price": 700 }
+  ],
+  "partPriceRatio": 0.35,
+  "statPriceGrowth": 2.5,
+  "stats": [
+    { "id": "maxHealth", "name": "최대 체력", "description": "최대 체력 +25", "basePrice": 100, "value": 25 },
+    { "id": "armor", "name": "방어력", "description": "받는 피해 -6%", "basePrice": 150, "value": 0.06 },
+    { "id": "moveSpeed", "name": "이동속도", "description": "이동속도 +7%", "basePrice": 150, "value": 0.07 },
+    { "id": "reloadSpeed", "name": "장전 속도", "description": "재장전 시간 -12%", "basePrice": 150, "value": 0.12 },
+    { "id": "ammoCapacity", "name": "탄약 보유량", "description": "탄종별 최대 예비탄 +100", "basePrice": 100, "value": 100 }
+  ],
+  "ammoPack": { "price": 50 },
+  "ammoPacks": [
+    { "ammoId": "colt45", "referenceWeaponId": "m1873" },
+    { "ammoId": "wcf4065", "referenceWeaponId": "win1886" },
+    { "ammoId": "p9x19", "referenceWeaponId": "mp18" },
+    { "ammoId": "b303", "referenceWeaponId": "smle" },
+    { "ammoId": "ga12", "referenceWeaponId": "colt1878" },
+    { "ammoId": "acp45", "referenceWeaponId": "thompson" },
+    { "ammoId": "r762x54", "referenceWeaponId": "mosin" },
+    { "ammoId": "m792", "referenceWeaponId": "mg42" }
+  ],
+  "slotUpgrades": {
+    "offerCount": 2,
+    "pool": [
+      { "perkId": "discountLever", "price": 120 },
+      { "perkId": "killStack", "price": 130 },
+      { "perkId": "fastSpindle", "price": 150 },
+      { "perkId": "payPlus", "price": 150 },
+      { "perkId": "piggyBank", "price": 120 }
+    ]
+  }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // 원거리는 실제 엄폐 뒤로 이동 → 숨기 → 노출점 이동 → 탄 발사 → 복귀한다.
@@ -6,6 +7,11 @@ using UnityEngine;
 // 원거리 적은 웨이브 무기를 받아 공격 값과 손에 든 총 모델을 그 무기로 맞춘다. 근접 적은 무기를 받지 않는다.
 public sealed class Enemy : MonoBehaviour, IDamageable
 {
+    public const float DEFAULT_HEADSHOT_MULTIPLIER = 1.5f;
+    public const float DEFAULT_HELMET_REDUCTION = 0.4f;
+    // 머리 영역 기본값(콜라이더 높이 대비 비율). 실제 값은 EnemyData.headHeightRatio를 쓴다.
+    public const float DEFAULT_HEAD_HEIGHT_RATIO = 0.72f;
+
     private const string BASE_COLOR_PROPERTY = "_BaseColor";
     // 피격 반응: 몸이 잠깐 흰색으로 번쩍인다. 처치 시에는 앞으로 쓰러진다.
     private const float HIT_FLASH_SECONDS = 0.08f;
@@ -18,6 +24,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     [SerializeField] private Renderer bodyRenderer;
     // 무기 모델 부모. 자식 이름이 무기 id와 같은 모델만 켜진다. 모델은 프리팹에 미리 둔다.
     [SerializeField] private Transform weaponMount;
+    // 근접 적만 드는 각목. 판정은 기존 근접 공격 로직을 사용한다.
+    [SerializeField] private GameObject meleeWeapon;
 
     private static readonly int BASE_COLOR_ID = Shader.PropertyToID(BASE_COLOR_PROPERTY);
 
@@ -48,7 +56,52 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     private bool firedThisPeek;
     private Transform activeMuzzle;
 
-    public enum CombatState { SeekingCover, MovingToCover, Hiding, MovingToPeek, Peeking, Retreating, Advancing, Melee, Stopped }
+    // 전투 확장: 헤드샷, 헬멧, 저지력 및 넉백
+    private float headshotMultiplier = DEFAULT_HEADSHOT_MULTIPLIER;
+    private bool hasHelmet;
+    private float helmetDamageReduction = DEFAULT_HELMET_REDUCTION;
+    private float stoppingResistance = 50f;
+    private float stoppingDecayRate = 20f;
+    private float staggerDuration = 0.4f;
+    private float staggerImmunityDuration = 1.0f;
+    private float knockbackResistance = 0.0f;
+    private float headHeightRatio = DEFAULT_HEAD_HEIGHT_RATIO;
+
+    private float accumulatedStopping;
+    private float staggerUntil;
+    private float staggerImmunityUntil;
+    private float lastHitTime;
+    private readonly Dictionary<int, PelletGroupRecord> pelletRecords = new Dictionary<int, PelletGroupRecord>();
+
+    // 산탄 한 발(같은 그룹)에 대한 이 적의 누적. 저지력은 상한까지 합산하고, 넉백은 명중 산탄을 모아 발사당 한 번만 적용한다.
+    private sealed class PelletGroupRecord
+    {
+        public float accumulatedStopping;
+        public float timestamp;
+        // 넉백 누적: 명중 산탄 수, 거리 계수 합, 방향 합, 발사 넉백 세기, 발사 산탄 수, 첫 명중 프레임.
+        public int knockbackHits;
+        public float distanceFactorSum;
+        public Vector3 directionSum;
+        public float knockback;
+        public int pelletCount = 1;
+        public int firstHitFrame = -1;
+        public bool knockbackApplied;
+    }
+
+    public enum CombatState
+    {
+        SeekingCover,
+        MovingToCover,
+        Hiding,
+        MovingToPeek,
+        Peeking,
+        Retreating,
+        Advancing,
+        Melee,
+        Stopped,
+        Staggered
+    }
+
     public CombatState State { get; private set; } = CombatState.SeekingCover;
     public CoverNode CurrentCover => cover;
     public EnemyNavigation Navigation => navigation;
@@ -62,7 +115,21 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     public int Reward => stats != null ? stats.reward : 0;
     // 들고 있는 무기 id. 근접 적은 항상 빈 문자열이다.
     public string WeaponId => weapon != null ? weapon.id : "";
+    public string PlayerWeaponId => weapon != null ? weapon.playerWeaponId : "";
     public string DropAmmoId => weapon != null ? weapon.dropAmmoId : "";
+
+    // 전투 정보 조회 프로퍼티
+    public float AccumulatedStopping => accumulatedStopping;
+    public float StoppingResistance => stoppingResistance;
+    public float StoppingDecayRate => stoppingDecayRate;
+    public float StaggerDuration => staggerDuration;
+    public float StaggerImmunityDuration => staggerImmunityDuration;
+    public bool IsStaggered => State == CombatState.Staggered;
+    public bool IsStaggerImmune => Time.time < staggerImmunityUntil;
+    public bool HasHelmet => hasHelmet;
+    public float HeadshotMultiplier => headshotMultiplier;
+    public float HelmetDamageReduction => helmetDamageReduction;
+    public float KnockbackResistance => knockbackResistance;
 
     public event Action<Enemy> Died;
 
@@ -74,7 +141,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         dead = false;
         stopped = false;
         ReleaseCover();
-        ai = TableManager.Instance.EnemyAi;
+        ai = TableManager.Instance != null ? TableManager.Instance.EnemyAi : null;
         navigation = GetComponent<EnemyNavigation>();
         if (navigation != null)
         {
@@ -95,8 +162,88 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         nextAttackTime = Time.time + 0.5f;
         baseTint = _tint;
         flashing = false;
+
+        // 전투 스탯 초기화 (기본값 설정 및 EnemyData 폴백)
+        ConfigureCombatStats(_stats);
+
         ApplyTint(_tint);
         ShowWeapon(armed ? weapon.id : "");
+        if (meleeWeapon != null)
+        {
+            meleeWeapon.SetActive(stats != null && !stats.ranged);
+        }
+    }
+
+    private void ConfigureCombatStats(EnemyData.Entry _stats)
+    {
+        string kind = _stats != null ? _stats.id : "";
+        if (kind == EnemyInfo.HEAVY_ID)
+        {
+            headshotMultiplier = DEFAULT_HEADSHOT_MULTIPLIER;
+            hasHelmet = true;
+            helmetDamageReduction = 0.4f;
+            stoppingResistance = 120f;
+            stoppingDecayRate = 30f;
+            staggerDuration = 0.3f;
+            staggerImmunityDuration = 1.5f;
+            knockbackResistance = 0.6f;
+        }
+        else if (kind == EnemyInfo.RIFLEMAN_ID)
+        {
+            headshotMultiplier = DEFAULT_HEADSHOT_MULTIPLIER;
+            hasHelmet = false;
+            helmetDamageReduction = 0f;
+            stoppingResistance = 50f;
+            stoppingDecayRate = 20f;
+            staggerDuration = 0.4f;
+            staggerImmunityDuration = 1.0f;
+            knockbackResistance = 0.2f;
+        }
+        else
+        {
+            headshotMultiplier = DEFAULT_HEADSHOT_MULTIPLIER;
+            hasHelmet = false;
+            helmetDamageReduction = 0f;
+            stoppingResistance = 40f;
+            stoppingDecayRate = 15f;
+            staggerDuration = 0.5f;
+            staggerImmunityDuration = 1.0f;
+            knockbackResistance = 0.0f;
+        }
+
+        // 전투 수치는 EnemyData 테이블에서 읽는다. 테이블이 없으면 필드 기본값을 유지한다.
+        if (_stats != null)
+        {
+            headshotMultiplier = _stats.headshotMultiplier > 0f ? _stats.headshotMultiplier : DEFAULT_HEADSHOT_MULTIPLIER;
+            hasHelmet = _stats.hasHelmet;
+            helmetDamageReduction = Mathf.Clamp01(_stats.helmetDamageReduction);
+            stoppingResistance = _stats.stoppingResistance;
+            stoppingDecayRate = _stats.stoppingDecayRate;
+            staggerDuration = _stats.staggerDuration;
+            staggerImmunityDuration = _stats.staggerImmunityDuration;
+            knockbackResistance = Mathf.Clamp01(_stats.knockbackResistance);
+            headHeightRatio = _stats.headHeightRatio > 0f ? Mathf.Clamp01(_stats.headHeightRatio) : DEFAULT_HEAD_HEIGHT_RATIO;
+        }
+
+        accumulatedStopping = 0f;
+        staggerUntil = 0f;
+        staggerImmunityUntil = 0f;
+        lastHitTime = 0f;
+        pelletRecords.Clear();
+    }
+
+    // 테스트 및 외부 커스텀 튜닝 지원
+    public void SetCombatTuning(float _headshotMult, bool _hasHelmet, float _helmetReduction,
+        float _stoppingRes, float _decayRate, float _staggerDur, float _immunityDur, float _knockbackRes)
+    {
+        headshotMultiplier = _headshotMult > 0f ? _headshotMult : DEFAULT_HEADSHOT_MULTIPLIER;
+        hasHelmet = _hasHelmet;
+        helmetDamageReduction = Mathf.Clamp01(_helmetReduction);
+        stoppingResistance = _stoppingRes > 0f ? _stoppingRes : 50f;
+        stoppingDecayRate = _decayRate >= 0f ? _decayRate : 20f;
+        staggerDuration = _staggerDur >= 0f ? _staggerDur : 0.4f;
+        staggerImmunityDuration = _immunityDur >= 0f ? _immunityDur : 1.0f;
+        knockbackResistance = Mathf.Clamp01(_knockbackRes);
     }
 
     private void Update()
@@ -111,6 +258,35 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         {
             return;
         }
+
+        ApplyPendingKnockback();
+
+        // 저지력 감쇠 (피격이 없는 동안 서서히 감소)
+        if (accumulatedStopping > 0f && Time.time - lastHitTime > 0.3f)
+        {
+            accumulatedStopping = Mathf.Max(0f, accumulatedStopping - stoppingDecayRate * Time.deltaTime);
+        }
+
+        // 경직 상태 처리: 경직 중에는 이동 및 공격을 하지 않는다
+        if (State == CombatState.Staggered)
+        {
+            if (Time.time >= staggerUntil)
+            {
+                // 경직 종료 및 면역 시작
+                staggerImmunityUntil = Time.time + staggerImmunityDuration;
+                if (stats.ranged)
+                {
+                    State = cover != null ? CombatState.Hiding : CombatState.SeekingCover;
+                    nextCoverSearch = 0f;
+                }
+                else
+                {
+                    State = CombatState.Melee;
+                }
+            }
+            return;
+        }
+
         if (target == null || !target.IsAlive)
         {
             StopCombat();
@@ -149,6 +325,10 @@ public sealed class Enemy : MonoBehaviour, IDamageable
 
     private void UpdateRanged(float _distance)
     {
+        if (ai == null)
+        {
+            return;
+        }
         if (cover != null && Time.time >= nextValidation)
         {
             nextValidation = Time.time + ai.revalidateSeconds;
@@ -249,6 +429,10 @@ public sealed class Enemy : MonoBehaviour, IDamageable
 
     private bool Arrived(Vector3 _position)
     {
+        if (ai == null)
+        {
+            return true;
+        }
         Vector3 delta = _position - transform.position;
         delta.y = 0f;
         return delta.magnitude <= ai.arrivalDistance + 0.05f;
@@ -256,7 +440,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
 
     private void FindCover()
     {
-        if (navigation == null || !navigation.Ready)
+        if (navigation == null || !navigation.Ready || ai == null)
         {
             return;
         }
@@ -319,7 +503,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         ReleaseCover();
         navigation?.Stop();
         State = CombatState.SeekingCover;
-        nextCoverSearch = Time.time + ai.coverRetrySeconds;
+        nextCoverSearch = Time.time + (ai != null ? ai.coverRetrySeconds : 1f);
     }
 
     private void ReleaseCover()
@@ -345,6 +529,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         navigation?.Stop();
     }
 
+    // 기본 IDamageable 구현 (레거시 및 단순 피해 호출용)
     public void TakeDamage(float _amount)
     {
         if (dead || _amount <= 0f)
@@ -360,6 +545,314 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         }
         StartHitFlash();
         SoundPlayer.Play(SfxType.EnemyHit);
+    }
+
+    // 정밀 전투 판정: 헤드샷, 헬멧 경감, 저지력 누적/경직/공격중단, 넉백 처리
+    public CombatHitResult TakeHit(Projectile.Shot _shot, RaycastHit _hit, Vector3 _shotOrigin)
+    {
+        if (dead)
+        {
+            return new CombatHitResult
+            {
+                damagedEnemy = false,
+                killed = false
+            };
+        }
+
+        HitZone zone = DetermineHitZone(_hit);
+        bool isHead = zone == HitZone.Head || zone == HitZone.Helmet;
+        bool isHelmet = isHead && (hasHelmet || zone == HitZone.Helmet);
+        float baseDamage = _shot.damage;
+        float finalDamage = baseDamage;
+
+        if (isHead)
+        {
+            float mult = headshotMultiplier > 0f ? headshotMultiplier : DEFAULT_HEADSHOT_MULTIPLIER;
+            float headDamage = baseDamage * mult;
+            if (isHelmet && helmetDamageReduction > 0f)
+            {
+                float mitigated = headDamage * (1f - helmetDamageReduction);
+                // 헬멧 피해 감소는 몸통 피해보다 낮아지지 않도록 제한
+                finalDamage = Mathf.Max(baseDamage, mitigated);
+            }
+            else
+            {
+                finalDamage = headDamage;
+            }
+        }
+
+        if (finalDamage > 0f)
+        {
+            health -= finalDamage;
+        }
+
+        if (health <= 0f)
+        {
+            Die();
+            return new CombatHitResult
+            {
+                damagedEnemy = true,
+                killed = true,
+                isHeadshot = isHead,
+                isHelmetHit = isHelmet,
+                damageDealt = finalDamage,
+                stoppingApplied = _shot.stoppingPower,
+                staggered = false,
+                knockedBack = false
+            };
+        }
+
+        StartHitFlash();
+        SoundPlayer.Play(SfxType.EnemyHit);
+
+        // 저지력 처리 (헤드샷 보너스 없음, 기본 저지력만 적용)
+        float stoppingPower = _shot.stoppingPower;
+        float appliedStopping = 0f;
+        bool triggeredStagger = false;
+
+        if (stoppingPower > 0f)
+        {
+            if (_shot.pelletGroup > 0)
+            {
+                PelletGroupRecord record = PelletRecord(_shot.pelletGroup);
+
+                float cap = _shot.pelletStopCap > 0f ? _shot.pelletStopCap : float.MaxValue;
+                float allowed = Mathf.Max(0f, cap - record.accumulatedStopping);
+                appliedStopping = Mathf.Min(stoppingPower, allowed);
+                record.accumulatedStopping += appliedStopping;
+            }
+            else
+            {
+                appliedStopping = stoppingPower;
+            }
+
+            lastHitTime = Time.time;
+
+            if (State != CombatState.Staggered && Time.time >= staggerImmunityUntil)
+            {
+                accumulatedStopping += appliedStopping;
+                if (accumulatedStopping >= stoppingResistance)
+                {
+                    TriggerStagger();
+                    triggeredStagger = true;
+                }
+            }
+        }
+
+        // 넉백: 단발은 즉시, 산탄은 같은 발사의 명중 산탄을 모아 다음 프레임에 한 번만 적용한다(명중 산탄 수·거리 반영).
+        bool appliedKnockback = false;
+        if (_shot.knockback > 0f && knockbackResistance < 1f)
+        {
+            Vector3 shotDir = _hit.point - _shotOrigin;
+            shotDir.y = 0f;
+            if (shotDir.sqrMagnitude < 0.0001f)
+            {
+                shotDir = transform.position - _shotOrigin;
+                shotDir.y = 0f;
+            }
+            float dist = Vector3.Distance(_shotOrigin, _hit.point);
+            float distFactor = Mathf.Clamp01(1f - (dist / Mathf.Max(1f, _shot.maxDistance)));
+
+            if (_shot.pelletGroup > 0)
+            {
+                PelletGroupRecord record = PelletRecord(_shot.pelletGroup);
+                if (!record.knockbackApplied && distFactor > 0f)
+                {
+                    record.knockbackHits++;
+                    record.distanceFactorSum += distFactor;
+                    record.directionSum += shotDir.normalized;
+                    record.knockback = _shot.knockback;
+                    record.pelletCount = Mathf.Max(1, _shot.pelletCount);
+                    if (record.firstHitFrame < 0)
+                    {
+                        record.firstHitFrame = Time.frameCount;
+                    }
+                    appliedKnockback = true;
+                }
+            }
+            else
+            {
+                float forceToApply = _shot.knockback * distFactor;
+                if (forceToApply > 0.001f)
+                {
+                    ApplyKnockback(shotDir, forceToApply);
+                    appliedKnockback = true;
+                }
+            }
+        }
+
+        return new CombatHitResult
+        {
+            damagedEnemy = true,
+            killed = false,
+            isHeadshot = isHead,
+            isHelmetHit = isHelmet,
+            damageDealt = finalDamage,
+            stoppingApplied = appliedStopping,
+            staggered = triggeredStagger,
+            knockedBack = appliedKnockback
+        };
+    }
+
+    private PelletGroupRecord PelletRecord(int _group)
+    {
+        PruneStalePelletRecords();
+        if (!pelletRecords.TryGetValue(_group, out PelletGroupRecord record))
+        {
+            record = new PelletGroupRecord();
+            pelletRecords[_group] = record;
+        }
+        record.timestamp = Time.time;
+        return record;
+    }
+
+    // 산탄 넉백 적용. 첫 명중 다음 프레임에 그 발사로 맞은 산탄을 모아 한 번 민다.
+    // 세기 = 발사 넉백 × (명중 산탄 수 / 발사 산탄 수) × 평균 거리 계수. 저항은 ApplyKnockback이 반영한다.
+    private void ApplyPendingKnockback()
+    {
+        foreach (var record in pelletRecords.Values)
+        {
+            if (record.knockbackApplied || record.knockbackHits <= 0 || Time.frameCount <= record.firstHitFrame)
+            {
+                continue;
+            }
+            record.knockbackApplied = true;
+            float hitRatio = Mathf.Clamp01((float)record.knockbackHits / record.pelletCount);
+            float force = record.knockback * hitRatio * (record.distanceFactorSum / record.knockbackHits);
+            ApplyKnockback(record.directionSum, force);
+        }
+    }
+
+    public HitZone DetermineHitZone(RaycastHit _hit)
+    {
+        if (_hit.collider != null)
+        {
+            EnemyHitbox hitbox = _hit.collider.GetComponent<EnemyHitbox>();
+            if (hitbox != null)
+            {
+                return hitbox.Zone;
+            }
+        }
+
+        // 폴백 기하학 판정: 적 몸체 상단부 판정
+        float enemyBottomY = transform.position.y;
+        float height = EnemyNavigation.HEIGHT;
+        var capsule = GetComponent<CapsuleCollider>();
+        if (capsule != null)
+        {
+            height = capsule.height;
+            enemyBottomY = transform.position.y + capsule.center.y - capsule.height * 0.5f;
+        }
+        else
+        {
+            var box = GetComponent<BoxCollider>();
+            if (box != null)
+            {
+                height = box.size.y;
+                enemyBottomY = transform.position.y + box.center.y - box.size.y * 0.5f;
+            }
+        }
+
+        float hitHeight = _hit.point.y - enemyBottomY;
+        if (hitHeight >= height * headHeightRatio)
+        {
+            return hasHelmet ? HitZone.Helmet : HitZone.Head;
+        }
+
+        return HitZone.Body;
+    }
+
+    public void TriggerStagger()
+    {
+        accumulatedStopping = 0f;
+        State = CombatState.Staggered;
+        staggerUntil = Time.time + staggerDuration;
+
+        // 공격 중단 및 내비게이션 정지
+        firedThisPeek = false;
+        navigation?.Stop();
+        nextAttackTime = Mathf.Max(nextAttackTime, Time.time + staggerDuration + 0.2f);
+    }
+
+    public void ApplyKnockback(Vector3 _direction, float _force)
+    {
+        if (dead || stopped || _force <= 0f)
+        {
+            return;
+        }
+
+        Vector3 moveDir = _direction;
+        moveDir.y = 0f;
+        if (moveDir.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+        moveDir.Normalize();
+
+        float effectiveDist = _force * Mathf.Clamp01(1f - knockbackResistance);
+        if (effectiveDist <= 0.001f)
+        {
+            return;
+        }
+
+        // 지형 충돌 검사 (벽 관통 방지)
+        float allowed = effectiveDist;
+        if (Physics.CapsuleCast(
+            transform.position + Vector3.up * EnemyNavigation.RADIUS,
+            transform.position + Vector3.up * (EnemyNavigation.HEIGHT - EnemyNavigation.RADIUS),
+            EnemyNavigation.RADIUS - 0.03f,
+            moveDir,
+            out RaycastHit hit,
+            effectiveDist + 0.03f,
+            ENEMY_SHOT_MASK,
+            QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider != null && hit.collider.GetComponentInParent<Enemy>() != this)
+            {
+                allowed = Mathf.Min(allowed, Mathf.Max(0f, hit.distance - 0.03f));
+            }
+        }
+
+        Vector3 targetPos = transform.position + moveDir * allowed;
+        if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 0.8f, UnityEngine.AI.NavMesh.AllAreas))
+        {
+            targetPos = navHit.position;
+        }
+
+        transform.position = targetPos;
+        var agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.nextPosition = targetPos;
+        }
+    }
+
+    private void PruneStalePelletRecords()
+    {
+        if (pelletRecords.Count == 0)
+        {
+            return;
+        }
+        float now = Time.time;
+        List<int> toRemove = null;
+        foreach (var pair in pelletRecords)
+        {
+            if (now - pair.Value.timestamp > 2.0f)
+            {
+                if (toRemove == null)
+                {
+                    toRemove = new List<int>();
+                }
+                toRemove.Add(pair.Key);
+            }
+        }
+        if (toRemove != null)
+        {
+            for (int i = 0; i < toRemove.Count; i++)
+            {
+                pelletRecords.Remove(toRemove[i]);
+            }
+        }
     }
 
     private void StartHitFlash()
@@ -378,7 +871,14 @@ public sealed class Enemy : MonoBehaviour, IDamageable
             return;
         }
         // 근접 러셔는 총이 없어 접촉 거리에서 직접 때린다. 원거리 적은 위에서 발사체만 보낸다.
-        target.ApplyDamage(attackDamage, transform.position);
+        target.ApplyDamage(attackDamage, transform.position, CaptureAttackSource(transform.position));
+    }
+
+    private LogAttackSource CaptureAttackSource(Vector3 _position)
+    {
+        string weaponId = stats != null && !stats.ranged ? "unarmed" : WeaponId;
+        return new LogAttackSource(KindId, weaponId,
+            new LogPosition3 { x = _position.x, y = _position.y, z = _position.z });
     }
 
     // 원거리 적의 발사. 피해는 여기서 주지 않는다. 탄이 플레이어나 지형에 닿을 때 Projectile이 준다.
@@ -411,7 +911,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
             speed = projectileSpeed,
             maxDistance = attackRange,
             lifetime = projectileLifetime,
-            radius = projectileRadius
+            radius = projectileRadius,
+            attackSource = CaptureAttackSource(origin)
         };
         ProjectileSpawner.Launch(ProjectileSpawner.ENEMY_BULLET, shot, origin, direction, ENEMY_SHOT_MASK, transform);
     }
@@ -444,7 +945,7 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         }
         StartHitFlash();
         transform.rotation *= Quaternion.Euler(FALL_ANGLE, 0f, 0f);
-        SoundPlayer.Play(stats.id == EnemyInfo.HEAVY_ID ? SfxType.Explosion : SfxType.EnemyDown);
+        SoundPlayer.Play(stats != null && stats.id == EnemyInfo.HEAVY_ID ? SfxType.Explosion : SfxType.EnemyDown);
         Died?.Invoke(this);
         Destroy(gameObject, 0.4f);
     }

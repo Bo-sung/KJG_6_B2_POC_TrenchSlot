@@ -17,6 +17,7 @@ public sealed class TableManager
     /// <summary>슬롯머신 당첨·가격 테이블. 로드 실패 시 빈 표이며 원인은 이미 로그로 남았다.</summary>
     public SlotMachineData SlotMachine { get; private set; }
     public WeaponData Weapon { get; private set; }
+    public PartData Part { get; private set; }
     public AmmoData Ammo { get; private set; }
     public EnemyData Enemy { get; private set; }
     public EnemyWeaponData EnemyWeapon { get; private set; }
@@ -25,6 +26,9 @@ public sealed class TableManager
     public ShopData Shop { get; private set; }
     public PerkData Perk { get; private set; }
     public GameConfigData GameConfig { get; private set; }
+    public WeaponAimData WeaponAim { get; private set; }
+    public LogData Log { get; private set; }
+    public TelemetryData Telemetry { get; private set; }
 
     private TableManager()
     {
@@ -38,12 +42,17 @@ public sealed class TableManager
         WeaponInfo.Validate(Weapon);
         WeaponInfo.ValidateAmmo(Weapon, Ammo);
 
+        Part = Load<PartData>(nameof(PartData));
+        PartInfo.Validate(Part);
+        PartInfo.ValidateWeapons(Part, Weapon);
+
         Enemy = Load<EnemyData>(nameof(EnemyData));
         EnemyInfo.Validate(Enemy);
 
         EnemyWeapon = Load<EnemyWeaponData>(nameof(EnemyWeaponData));
         EnemyWeaponInfo.Validate(EnemyWeapon);
         EnemyWeaponInfo.ValidateAmmo(EnemyWeapon, Ammo);
+        EnemyWeaponInfo.ValidatePlayerWeapons(EnemyWeapon, Weapon);
 
         EnemyAi = Load<EnemyAiData>(nameof(EnemyAiData));
         EnemyAiInfo.Validate(EnemyAi);
@@ -52,15 +61,26 @@ public sealed class TableManager
         WaveInfo.Validate(Wave);
         WaveInfo.ValidateEnemyWeapons(Wave, EnemyWeapon);
 
-        Shop = Load<ShopData>(nameof(ShopData));
-        ShopInfo.Validate(Shop);
-        ShopInfo.ValidateAmmo(Shop, Ammo);
-
         Perk = Load<PerkData>(nameof(PerkData));
         PerkInfo.Validate(Perk);
 
+        Shop = Load<ShopData>(nameof(ShopData));
+        ShopInfo.Validate(Shop);
+        ShopInfo.ValidateReferences(Shop, Weapon, Ammo, Perk);
+
         GameConfig = Load<GameConfigData>(nameof(GameConfigData));
         GameConfigInfo.Validate(GameConfig);
+        WeaponAim = Load<WeaponAimData>(nameof(WeaponAimData));
+        Log = Load<LogData>(nameof(LogData));
+        if (!LogInfo.TryValidate(Log, out string logError))
+        {
+            Log.enabled = false;
+            Debug.LogError(logError);
+        }
+
+        Telemetry = Load<TelemetryData>(nameof(TelemetryData));
+        TelemetryInfo.ApplyLocalOverride(Telemetry);
+        TelemetryInfo.Validate(Telemetry);
     }
 
     /// <summary>반복 호출해도 테이블을 다시 읽지 않는다.</summary>

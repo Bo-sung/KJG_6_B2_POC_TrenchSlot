@@ -1,7 +1,7 @@
 {
   "enemies": [
-    { "id": "rusher", "name": "러셔", "maxHealth": 50, "moveSpeed": 5.5, "attackDamage": 12, "attackInterval": 1.0, "attackRange": 2, "stopDistance": 1.5, "ranged": false, "reward": 10 },
-    { "id": "rifleman", "name": "소총병", "maxHealth": 60, "moveSpeed": 2.5, "attackDamage": 8, "attackInterval": 1.6, "attackRange": 40, "stopDistance": 25, "ranged": true, "reward": 15, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.05 },
-    { "id": "heavy", "name": "중장", "maxHealth": 200, "moveSpeed": 2.0, "attackDamage": 15, "attackInterval": 2.0, "attackRange": 30, "stopDistance": 15, "ranged": true, "reward": 40, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.08 }
+    { "id": "rusher", "name": "러셔", "maxHealth": 50, "moveSpeed": 5.5, "attackDamage": 12, "attackInterval": 1.0, "attackRange": 2, "stopDistance": 1.5, "ranged": false, "reward": 10, "headshotMultiplier": 1.5, "hasHelmet": false, "helmetDamageReduction": 0, "stoppingResistance": 40, "stoppingDecayRate": 15, "staggerDuration": 0.5, "staggerImmunityDuration": 1.0, "knockbackResistance": 0.0, "headHeightRatio": 0.78 },
+    { "id": "rifleman", "name": "소총병", "maxHealth": 60, "moveSpeed": 2.5, "attackDamage": 8, "attackInterval": 1.6, "attackRange": 40, "stopDistance": 25, "ranged": true, "reward": 15, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.05, "headshotMultiplier": 1.5, "hasHelmet": false, "helmetDamageReduction": 0, "stoppingResistance": 50, "stoppingDecayRate": 20, "staggerDuration": 0.4, "staggerImmunityDuration": 1.0, "knockbackResistance": 0.2, "headHeightRatio": 0.78 },
+    { "id": "heavy", "name": "중장", "maxHealth": 200, "moveSpeed": 2.0, "attackDamage": 15, "attackInterval": 2.0, "attackRange": 30, "stopDistance": 15, "ranged": true, "reward": 40, "projectileSpeed": 70, "projectileLifetime": 1.0, "projectileRadius": 0.08, "headshotMultiplier": 1.5, "hasHelmet": true, "helmetDamageReduction": 0.4, "stoppingResistance": 120, "stoppingDecayRate": 30, "staggerDuration": 0.3, "staggerImmunityDuration": 1.5, "knockbackResistance": 0.6, "headHeightRatio": 0.78 }
   ]
 }
