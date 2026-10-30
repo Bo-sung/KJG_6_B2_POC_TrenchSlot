@@ -130,28 +130,39 @@ public static class PocVerification
         Check(slotTable.symbols.Length == 6, "slot symbol count is 6");
         Check(SlotMachineInfo.SpinCost(slotTable) == 10, "spin cost base 10");
         int total = SlotMachineInfo.TotalWeight(slotTable, 1);
-        Check(total == 2396, $"six weights sum to 2396 (got {total})");
-        Check(SlotMachineInfo.PickFace(slotTable, 0, 1) == 0, "roll 0 maps to rifle (reel 0)");
-        Check(SlotMachineInfo.PickFace(slotTable, 207, 1) == 0, "roll 207 still rifle");
-        Check(SlotMachineInfo.PickFace(slotTable, 208, 1) == 1, "roll 208 maps to helmet (reel 1)");
-        Check(SlotMachineInfo.PickFace(slotTable, 2395, 1) == 5, "last roll maps to seven (reel 5)");
-        Check(SlotMachineInfo.TotalWeight(slotTable, 3) == 2396 + 104 * 2, "ammo weight scale x3 raises ammo weight only");
+        Check(total == 2500, $"v4 six weights sum to 2500 (got {total})");
+        Check(SlotMachineInfo.PickFace(slotTable, 0, 1) == 0 && SlotMachineInfo.PickFace(slotTable, 149, 1) == 0, "rifle owns rolls 0..149 (150/2500)");
+        Check(SlotMachineInfo.PickFace(slotTable, 150, 1) == 1, "roll 150 maps to helmet (reel 1)");
+        // 가중치 구간은 JSON 순서(소총·철모·파츠·인식표·탄약·7)로 쌓인다.
+        Check(SlotMachineInfo.PickFace(slotTable, 450, 1) == 2 && SlotMachineInfo.PickFace(slotTable, 949, 1) == 2, "part owns rolls 450..949 (500)");
+        Check(SlotMachineInfo.PickFace(slotTable, 1900, 1) == 4 && SlotMachineInfo.PickFace(slotTable, 2249, 1) == 4, "ammo owns rolls 1900..2249 (350)");
+        Check(SlotMachineInfo.PickFace(slotTable, 2250, 1) == 5 && SlotMachineInfo.PickFace(slotTable, 2499, 1) == 5, "seven owns rolls 2250..2499 (250)");
+        Check(SlotMachineInfo.TotalWeight(slotTable, 3) == 2500 + 350 * 2, "ammo weight scale x3 raises ammo weight only (3200)");
 
         var triple = SlotMachineInfo.Evaluate(slotTable, new[] { 0, 0, 0 });
-        Check(triple.tripleFace == 0 && triple.multiplier == 40, "rifle x3 pays x40");
-        var pair = SlotMachineInfo.Evaluate(slotTable, new[] { 2, 2, 5 });
-        Check(pair.pairFace == 2 && pair.multiplier == 1 && pair.tripleFace < 0, "shell x2 pays x1");
+        Check(triple.tripleFace == 0 && triple.multiplier == 20 && triple.partCount == 1 && triple.nextEraPartCount == 0 && !triple.hasAmmo && !triple.isMiss,
+            "rifle x3 pays $200 (x20) + one current-era part");
+        var helmet = SlotMachineInfo.Evaluate(slotTable, new[] { 1, 1, 1 });
+        Check(helmet.multiplier == 5 && helmet.partCount == 1, "helmet x3 pays $50 + one part");
+        var dogtagTriple = SlotMachineInfo.Evaluate(slotTable, new[] { 3, 3, 3 });
+        Check(dogtagTriple.multiplier == 1 && dogtagTriple.partCount == 0, "dogtag triple pays $10 and never a part");
+        var pair = SlotMachineInfo.Evaluate(slotTable, new[] { 3, 3, 5 });
+        Check(pair.pairFace == 3 && pair.multiplier == 1 && pair.tripleFace < 0 && !pair.isMiss, "dogtag pair pays $10");
         var near = SlotMachineInfo.Evaluate(slotTable, new[] { 0, 0, 1 });
-        Check(near.pairFace == 0 && near.multiplier == 0 && near.isNearMiss, "rifle pair without pay is near miss");
+        Check(near.pairFace == 0 && near.multiplier == 0 && near.isNearMiss && near.isMiss, "rifle pair without pay is near miss and a miss");
         var ammo = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 1, 3 });
-        Check(ammo.hasAmmo && ammo.multiplier == 0, "ammo on one reel refills, no pay");
+        Check(!ammo.hasAmmo && ammo.isMiss, "single ammo on one reel is not a refill (triple only)");
+        var ammoTriple = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 4, 4 });
+        Check(ammoTriple.hasAmmo && ammoTriple.multiplier == 0 && ammoTriple.partCount == 0 && !ammoTriple.isMiss, "ammo triple refills, no cash multiplier");
+        var ammoPair = SlotMachineInfo.Evaluate(slotTable, new[] { 4, 4, 0 });
+        Check(!ammoPair.hasAmmo && ammoPair.multiplier == 0 && ammoPair.isMiss, "ammo pair gives no bonus at all");
         var none = SlotMachineInfo.Evaluate(slotTable, new[] { 1, 2, 3 });
-        Check(none.multiplier == 0 && !none.hasAmmo && none.pairFace < 0 && !none.isNearMiss, "all different is a plain miss");
+        Check(none.multiplier == 0 && !none.hasAmmo && none.pairFace < 0 && !none.isNearMiss && none.isMiss, "all different is a plain miss");
         var seven = SlotMachineInfo.Evaluate(slotTable, new[] { 5, 5, 5 });
-        Check(seven.multiplier == 50, "seven x3 pays x50");
+        Check(seven.multiplier == 25 && seven.partCount == 1 && seven.nextEraPartCount == 1, "seven x3 pays $250 + current + next-era part");
 
         double analytic = AnalyticRtp(slotTable);
-        Check(Math.Abs(analytic - 0.6941) < 0.001, $"analytic RTP ~0.694 with independent reels (got {analytic:0.0000})");
+        Check(Math.Abs(analytic - 0.3614) < 0.0005, $"analytic cash RTP ~0.361 multiplier (v4 weights, got {analytic:0.0000})");
         double simulated = SimulateRtp(slotTable, MONTE_CARLO_SPINS);
         Check(Math.Abs(simulated - analytic) < RTP_TOLERANCE, $"simulated RTP {simulated:0.0000} matches analytic {analytic:0.0000}");
 
@@ -238,6 +249,7 @@ public static class PocVerification
         Check(startRevolver != null && startRevolver.id == "m1873" && startRevolver.magazineSize == 6, "player starts with six-round Colt SAA M1873 (table)");
         // 상점·무기 슬롯·파츠 모델 검사는 에디터를 종료하지 않는 PocShopVerification에 있다.
         failures += PocShopVerification.RunModelChecks();
+        failures += PocSlotRewardVerification.RunModelChecks();
 
         Debug.Log($"{TAG} unit checks finished: failures={failures}");
         PocEditorExit.Exit(failures == 0 ? 0 : 1);
@@ -338,7 +350,6 @@ public static class PocVerification
         }
         Check(typeof(PlayerWeapon).GetEvent("EnemyHit") != null, "PlayerWeapon exposes EnemyHit confirmed-hit event");
         Check(typeof(PlayerWeapon).GetProperty("ReloadProgress") != null, "PlayerWeapon exposes ReloadProgress");
-        Check(ShopInfo.CanHeal(20f, 100f) && !ShopInfo.CanHeal(100f, 100f) && !ShopInfo.CanHeal(0f, 0f), "heal item buyable only below max health");
 
         Debug.Log($"{TAG} feedback finished: failures={failures}");
         PocEditorExit.Exit(failures == 0 ? 0 : 1);
@@ -536,7 +547,7 @@ public static class PocVerification
                 return;
 
             case 5:
-                if (elapsed < 31d)
+                if (elapsed < (double)gm.ShopDuration + 1d)
                 {
                     return;
                 }

@@ -38,7 +38,7 @@ public sealed class ShopPresenter : MonoBehaviour
         view.UpgradeClicked += OnUpgradeClicked;
         view.NextWaveClicked += OnNextWaveClicked;
         gameManager.PhaseChanged += OnPhaseChanged;
-        gameManager.IntermissionChanged += view.SetIntermission;
+        gameManager.IntermissionChanged += OnIntermissionChanged;
         gameManager.Wallet.BalanceChanged += OnWalletChanged;
         gameManager.Loadout.Changed += Refresh;
         gameManager.Parts.Changed += Refresh;
@@ -72,10 +72,7 @@ public sealed class ShopPresenter : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.PhaseChanged -= OnPhaseChanged;
-            if (view != null)
-            {
-                gameManager.IntermissionChanged -= view.SetIntermission;
-            }
+            gameManager.IntermissionChanged -= OnIntermissionChanged;
             gameManager.Wallet.BalanceChanged -= OnWalletChanged;
             gameManager.Loadout.Changed -= Refresh;
             gameManager.Parts.Changed -= Refresh;
@@ -91,7 +88,7 @@ public sealed class ShopPresenter : MonoBehaviour
     {
         int slots = gameManager.Loadout.SlotCount;
         if (view.WeaponRowCount < shop.weapons.Length || view.StatRowCount < shop.stats.Length ||
-            view.SupplyRowCount < shop.ammoPacks.Length + 1 || view.UpgradeRowCount < ShopInfo.SlotOfferCount(shop) ||
+            view.SupplyRowCount < shop.ammoPacks.Length || view.UpgradeRowCount < ShopInfo.SlotOfferCount(shop) ||
             view.WeaponBuyCount < slots || view.SlotCardCount < slots || view.PartSlotButtonCount < slots ||
             view.PartChipCount < MaxPartsPerWeapon())
         {
@@ -245,17 +242,12 @@ public sealed class ShopPresenter : MonoBehaviour
         }
     }
 
-    // 보급 줄: 체력 회복 한 줄 뒤에 탄약 팩(테이블 순서). 잠긴 탄약은 숨기므로 회복을 맨 위에 둔다.
+    // 보급은 탄약 팩만 판매한다. 체력은 슬롯 회전으로 회복한다.
     private void OnSupplyClicked(int _index)
     {
-        int pack = _index - 1;
-        if (_index == 0)
+        if (_index >= 0 && _index < shop.ammoPacks.Length && shop.ammoPacks[_index] != null)
         {
-            Report(gameManager.TryBuyHeal(), "체력 회복");
-        }
-        else if (pack >= 0 && pack < shop.ammoPacks.Length && shop.ammoPacks[pack] != null)
-        {
-            Report(gameManager.TryBuyAmmo(shop.ammoPacks[pack].ammoId), "탄약 팩 구매");
+            Report(gameManager.TryBuyAmmo(shop.ammoPacks[_index].ammoId), "탄약 팩 구매");
         }
     }
 
@@ -267,6 +259,13 @@ public sealed class ShopPresenter : MonoBehaviour
     private void OnNextWaveClicked()
     {
         gameManager.StartNextWave();
+    }
+
+    private void OnIntermissionChanged(float _seconds)
+    {
+        if (view == null) return;
+        float total = gameManager != null ? gameManager.ShopDuration : 0f;
+        view.SetIntermission(_seconds, total);
     }
 
     private void Report(string _failure, string _success)
@@ -521,18 +520,11 @@ public sealed class ShopPresenter : MonoBehaviour
     private void RefreshSupplies(bool _open, int _wave)
     {
         var ammo = gameManager.Ammo;
-        int rounds = ShopInfo.AmmoPackRounds(shop);
         for (int i = 0; i < view.SupplyRowCount; i++)
         {
-            if (i == 0)
+            if (i < shop.ammoPacks.Length)
             {
-                int price = ShopInfo.HealPrice(shop);
-                string label = $"{shop.heal.label}\n<size=90%><color=#AEBCCD>체력 +{GameConfigInfo.HealAmount(TableManager.Instance.GameConfig)}</color></size>";
-                view.SetSupplyRow(i, label, gameManager.CanHeal ? $"${price:N0}" : "최대", _open && gameManager.CanHeal && gameManager.Wallet.CanAfford(price));
-            }
-            else if (i - 1 < shop.ammoPacks.Length)
-            {
-                var pack = shop.ammoPacks[i - 1];
+                var pack = shop.ammoPacks[i];
                 if (pack == null || !ShopInfo.IsAmmoUnlocked(shop, weapons, pack.ammoId, _wave))
                 {
                     view.SetSupplyRow(i, "", "", false);
@@ -540,7 +532,7 @@ public sealed class ShopPresenter : MonoBehaviour
                 }
                 int price = ShopInfo.AmmoPackPrice(shop, pack);
                 bool canAdd = ShopInfo.CanAddAmmo(ammo, pack.ammoId);
-                string label = $"{AmmoName(pack.ammoId)} +{rounds}\n<size=90%><color=#AEBCCD>예비 {ammo.GetReserve(pack.ammoId)} / {ammo.GetMaximum(pack.ammoId)}</color></size>";
+                string label = $"{AmmoName(pack.ammoId)} 전량 충전\n<size=90%><color=#AEBCCD>예비 {ammo.GetReserve(pack.ammoId)} / {ammo.GetMaximum(pack.ammoId)}</color></size>";
                 view.SetSupplyRow(i, label, canAdd ? $"${price:N0}" : "최대", _open && canAdd && gameManager.Wallet.CanAfford(price));
             }
             else

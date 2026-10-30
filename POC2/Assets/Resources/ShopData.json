@@ -1,6 +1,7 @@
 {
   "status": "provisional",
-  "note": "가격은 상점-세부설계 기준 임시값. M1873 재구매가, 파츠 35%, 탄약 팩 125발은 재검토 대상.",
+  "note": "가격과 탄약 전량 보급 $50은 잠정값(기존 상세기획 $200에서 초반 경제성 개선을 위해 $50으로 인하). 상점 기본 시간 60초(스킵 가능). 슬롯 v4에 맞춘다.",
+  "durationSeconds": 60,
   "priceRounding": 5,
   "eras": [
     { "id": "1887", "name": "1887 서부", "startWave": 1 },
@@ -29,7 +30,7 @@
     { "id": "reloadSpeed", "name": "장전 속도", "description": "재장전 시간 -12%", "basePrice": 150, "value": 0.12 },
     { "id": "ammoCapacity", "name": "탄약 보유량", "description": "탄종별 최대 예비탄 +100", "basePrice": 100, "value": 100 }
   ],
-  "ammoPack": { "rounds": 125, "priceRatio": 0.2 },
+  "ammoPack": { "price": 50 },
   "ammoPacks": [
     { "ammoId": "colt45", "referenceWeaponId": "m1873" },
     { "ammoId": "wcf4065", "referenceWeaponId": "win1886" },
@@ -40,7 +41,6 @@
     { "ammoId": "r762x54", "referenceWeaponId": "mosin" },
     { "ammoId": "m792", "referenceWeaponId": "mg42" }
   ],
-  "heal": { "label": "응급 처치", "price": 30 },
   "slotUpgrades": {
     "offerCount": 2,
     "pool": [

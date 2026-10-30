@@ -26,9 +26,11 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private TMP_Text moneyText;
     [SerializeField] private TMP_Text waveText;
     [SerializeField] private TMP_Text timerText;
+    [SerializeField] private Image timerFill;
     [SerializeField] private TMP_Text ammoText;
     [SerializeField] private TMP_Text killsText;
     [SerializeField] private TMP_Text promptText;
+    [SerializeField] private TMP_Text crosshair;
     [SerializeField] private TMP_Text bannerText;
     [SerializeField] private CanvasGroup bannerGroup;
     [SerializeField] private TMP_Text resultText;
@@ -54,6 +56,11 @@ public sealed class HudView : MonoBehaviour
 
     private void Awake()
     {
+        if (crosshair == null)
+        {
+            var existing = transform.Find("Crosshair");
+            if (existing != null) crosshair = existing.GetComponent<TMP_Text>();
+        }
         healthBaseColor = healthFill.color;
         ammoBaseColor = ammoText.color;
         ammoText.verticalAlignment = VerticalAlignmentOptions.Bottom;
@@ -66,6 +73,11 @@ public sealed class HudView : MonoBehaviour
             hitMarkerGroup.alpha = 0f;
         }
         SetDamageDirection(0f, 0f);
+    }
+
+    public void SetCrosshairVisible(bool _visible)
+    {
+        if (crosshair != null) crosshair.enabled = _visible;
     }
 
     public void SetDamageDirection(float _bearingDegrees, float _alpha)
@@ -99,7 +111,24 @@ public sealed class HudView : MonoBehaviour
 
     public void SetTimer(float _left)
     {
-        timerText.text = $"{Mathf.CeilToInt(_left)}초";
+        SetTimer(_left, 0f, "");
+    }
+
+    public void SetTimer(float _left, float _total, string _status = "")
+    {
+        int seconds = Mathf.CeilToInt(_left);
+        int m = seconds / 60;
+        int s = seconds % 60;
+        string timeStr = m > 0 ? $"{m:00}:{s:00}" : $"{seconds}초";
+        if (timerText != null)
+        {
+            timerText.text = string.IsNullOrEmpty(_status) ? timeStr : $"{_status} · {timeStr}";
+        }
+        if (timerFill != null)
+        {
+            float ratio = _total > 0f ? Mathf.Clamp01(_left / _total) : (_left > 0f ? 1f : 0f);
+            timerFill.fillAmount = ratio;
+        }
     }
 
     // _weaponLabel은 휴대 슬롯 요약(사용 중 슬롯 강조)이다. 비어 있으면 생략한다.

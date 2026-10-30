@@ -6,8 +6,6 @@ public sealed class GameConfigData
 {
     public int maxHealth;
     public int startMoney;
-    // 정비 상점의 회복 아이템이 회복하는 체력.
-    public int healAmount;
     // 웨이브 시간 만료 후 생존 정비 진입 보상(잠정 밸런스).
     public int waveClearHealAmount;
     public int waveClearBonusBase;
@@ -27,4 +25,6 @@ public sealed class GameConfigData
     // 조준 시 기본 카메라 시야각의 비율과 전환 시간(초).
     public float aimFovRatio = 0.7f;
     public float aimTransitionSeconds = 0.15f;
+    public float recoilMaxPitchDegrees = 15f;
+    public float recoilMaxYawDegrees = 8f;
 }

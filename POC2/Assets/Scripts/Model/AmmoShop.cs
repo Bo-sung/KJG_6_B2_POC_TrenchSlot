@@ -1,4 +1,4 @@
-// 탄약 팩 구매. 팩 하나는 테이블 발수만큼 공유 예비탄에 더하며 중복 구매할 수 있다. 최대량을 넘는 몫은 버린다.
+// 탄약 충전 구매. 한 탄종의 공유 예비탄을 현재 최대량까지 채운다.
 public sealed class AmmoShop
 {
     private readonly ShopData table;
@@ -40,7 +40,7 @@ public sealed class AmmoShop
             {
                 return "소지금이 부족합니다.";
             }
-            int added = ammo.Add(_ammoId, ShopInfo.AmmoPackRounds(table));
+            int added = ammo.Add(_ammoId, ammo.GetMaximum(_ammoId) - ammo.GetReserve(_ammoId));
             if (added <= 0)
             {
                 wallet.Add(price);

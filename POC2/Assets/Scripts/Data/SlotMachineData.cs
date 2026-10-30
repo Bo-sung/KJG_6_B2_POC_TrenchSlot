@@ -20,13 +20,24 @@ public sealed class SlotMachineData
         public int multiplier;
         // 2릴 일치 시 배수. 0이면 2줄 지급 없음.
         public int pairMultiplier;
+        public int parts;
+        public int nextEraParts;
+        public bool fullAmmo;
     }
 
     // 기본 베팅. 할인 퍽이 있어도 지급 기준은 이 값이다.
     public int spinCost;
+    // 회전이 실제로 시작될 때 회복하는 체력(잠정값).
+    public float spinHealAmount;
     // 미스 가중치. v0는 0이며 모든 릴이 면 중 하나를 반드시 낸다.
     public int missWeight;
     // 기본 회전 시간(초). 고속 스핀들 퍽이 이 값에 배율을 곱한다.
     public float spinSeconds;
+    // 꽝·파츠 보상이 휴대 무기 풀을 고를 확률(나머지는 현 시대 풀). 0~1.
+    public float heldRewardChance = 0.7f;
+    // 꽝 탄약 지급량 = 탄종 기준 탄창 x 이 비율(올림, 최소 기준 탄창 1개 보장).
+    public float missAmmoFraction = 1f;
+    // 줄 보상으로 줄 탄약이 이미 가득 찼을 때 대신 주는 현금.
+    public int fullAmmoCash = 5;
     public Symbol[] symbols = Array.Empty<Symbol>();
 }

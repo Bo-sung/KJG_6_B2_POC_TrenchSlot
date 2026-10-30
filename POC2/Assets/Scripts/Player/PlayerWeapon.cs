@@ -22,6 +22,11 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 방아쇠 1회당 발사체 수와 산포 반각(도).
         [Min(1)] public int pellets;
         [Min(0f)] public float spreadDegrees;
+        public float hipSpreadDegrees;
+        public float aimSpreadMultiplier;
+        public float recoilPitchDegrees;
+        public float recoilYawDegrees;
+        public float recoilRecoveryDegreesPerSecond;
         // 발당 저지력, 산탄 발사 1회 합산 상한(0이면 없음), 넉백 세기. 적용은 전투 쪽(Enemy.TakeHit)이 한다.
         [Min(0f)] public float stoppingPower;
         [Min(0f)] public float pelletStoppingPowerCap;
@@ -78,6 +83,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     private InputAction aimInput;
     private float normalFieldOfView;
     private GameConfigData aimConfig;
+    private PlayerMovement playerMovement;
     private WeaponHeldModels heldModels;
     private float aimAmount;
     public bool IsAiming { get; private set; }
@@ -177,6 +183,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     public event Action<int> HandFired;
     // 휴대 슬롯 전환 요청(0부터). 빈 슬롯 확인과 전환은 받는 쪽이 한다.
     public event Action<int> SlotSelected;
+    public event Action<bool> AimChanged;
 
     private void Awake()
     {
@@ -188,6 +195,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         aimInput = fireAction != null && fireAction.action != null ? fireAction.action.actionMap?.FindAction("Aim") : null;
         if (aimCamera != null) normalFieldOfView = aimCamera.fieldOfView;
         aimConfig = TableManager.Instance.GameConfig;
+        playerMovement = GetComponent<PlayerMovement>();
     }
 
     private void OnEnable()
@@ -413,7 +421,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     // 조준은 유지 입력이며 아킴보·입력 차단·사망 중에는 허용하지 않는다.
     private void UpdateAim(bool _pressed, float _deltaTime)
     {
-        IsAiming = _pressed && !akimbo && InputGate.PlayerEnabled && (health == null || health.IsAlive) && aimCamera != null;
+        SetAiming(_pressed && !akimbo && InputGate.PlayerEnabled && (health == null || health.IsAlive) && aimCamera != null);
         if (aimCamera == null || normalFieldOfView <= 0f) return;
         float ratio = GameConfigInfo.AimFovRatio(aimConfig);
         aimAmount = Mathf.MoveTowards(aimAmount, IsAiming ? 1f : 0f, Mathf.Max(0f, _deltaTime) / GameConfigInfo.AimTransitionSeconds(aimConfig));
@@ -423,10 +431,17 @@ public sealed class PlayerWeapon : MonoBehaviour
 
     private void ResetAim()
     {
-        IsAiming = false;
+        SetAiming(false);
         aimAmount = 0f;
         if (aimCamera != null && normalFieldOfView > 0f) aimCamera.fieldOfView = normalFieldOfView;
         heldModels?.SetAim(aimCamera, current, 0f);
+    }
+
+    private void SetAiming(bool _value)
+    {
+        if (IsAiming == _value) return;
+        IsAiming = _value;
+        AimChanged?.Invoke(_value);
     }
 
     // 기존 재장전 시간은 빈 탄창 전체 기준. 단발 삽입 시 한 발당 시간으로 나눈다.
@@ -628,6 +643,9 @@ public sealed class PlayerWeapon : MonoBehaviour
         // 즉발 판정 대신 발사체를 보낸다. 피해는 탄이 실제로 닿는 순간 Projectile이 준다.
         // 산탄은 같은 그룹 번호를 붙여, 전투 쪽이 발사 1회 저지력 합산 상한과 1회 넉백을 적용하게 한다.
         int pellets = Mathf.Max(1, handSettings.pellets);
+        float spread = Mathf.Max(0f, handSettings.hipSpreadDegrees) * Mathf.Lerp(1f, Mathf.Clamp01(handSettings.aimSpreadMultiplier), aimAmount);
+        Vector3 shotDirection = SpreadDirection(aimCamera.transform, spread);
+        Quaternion shotRotation = Quaternion.FromToRotation(aimCamera.transform.forward, shotDirection);
         int group = pellets > 1 ? ++pelletGroupCounter : 0;
         var shot = new Projectile.Shot
         {
@@ -645,8 +663,8 @@ public sealed class PlayerWeapon : MonoBehaviour
         };
         for (int i = 0; i < pellets; i++)
         {
-            // 탄은 조준선(카메라 시선)이 닿는 점으로 모인다. 총구 오프셋 때문에 탄착이 조준점에서 어긋나지 않게 한다.
-            Vector3 view = SpreadDirection(aimCamera.transform, pellets > 1 ? handSettings.spreadDegrees : 0f);
+            // 발사 방향의 기본 산포와 각 산탄의 추가 산포를 별도로 적용한다.
+            Vector3 view = shotRotation * SpreadDirection(aimCamera.transform, pellets > 1 ? handSettings.spreadDegrees : 0f);
             Vector3 direction = AimPoint(view, handSettings.range) - origin;
             if (direction.sqrMagnitude < 0.0001f)
             {
@@ -658,6 +676,9 @@ public sealed class PlayerWeapon : MonoBehaviour
                 projectile.Impacted += _impact => OnProjectileImpact(_impact, group);
             }
         }
+        // 이 발은 반동 전 조준선으로 발사하고, 반동은 다음 발부터 영향을 준다.
+        if (playerMovement != null)
+            playerMovement.AddRecoil(handSettings.recoilPitchDegrees, UnityEngine.Random.Range(-handSettings.recoilYawDegrees, handSettings.recoilYawDegrees), handSettings.recoilRecoveryDegreesPerSecond);
     }
 
     // 카메라에서 _view 방향으로 사거리 안 첫 솔리드(자기 몸 제외)에 닿는 점. 없으면 사거리 끝 점이다.

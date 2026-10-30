@@ -7,8 +7,11 @@ public struct SlotOutcome
     public int pairFace;
     // 배수. 3줄이면 multiplier, 2줄이면 pairMultiplier, 없으면 0.
     public int multiplier;
-    // 탄약 심볼이 하나라도 나왔는지. true면 탄창을 즉시 채운다.
+    // 탄약상자 3줄은 예비탄 전량 충전이다.
     public bool hasAmmo;
+    public int partCount;
+    public int nextEraPartCount;
+    public bool isMiss;
     // 2릴이 맞고 나머지 하나가 빗나간 경우. 효과음 연출에 쓴다.
     public bool isNearMiss;
 }

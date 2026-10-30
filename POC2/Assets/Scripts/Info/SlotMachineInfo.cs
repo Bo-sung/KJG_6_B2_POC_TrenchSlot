@@ -6,10 +6,11 @@ public static class SlotMachineInfo
     // 릴 모델의 면 개수. 면 회전 각도(면 번호 x 60도)가 이 값에 맞춰져 있다.
     public const int REEL_FACE_COUNT = 6;
     public const int REEL_COUNT = 3;
-    // 탄약 심볼 id. 탄약은 나오면 탄창을 즉시 채운다.
+    // 탄약 심볼 id. 3줄이면 예비탄을 전량 충전한다.
     public const string AMMO_ID = "ammo";
 
     public static int SpinCost(SlotMachineData _table) => _table != null ? _table.spinCost : 0;
+    public static float SpinHealAmount(SlotMachineData _table) => _table != null ? Mathf.Max(0f, _table.spinHealAmount) : 0f;
 
     public static float SpinSeconds(SlotMachineData _table) => _table != null ? _table.spinSeconds : 0f;
 
@@ -26,7 +27,7 @@ public static class SlotMachineInfo
         return _symbol.id == AMMO_ID ? _symbol.weight * Mathf.Max(1, _ammoWeightScale) : _symbol.weight;
     }
 
-    // 릴 한 칸의 전체 가중치. 미스와 심볼 가중치의 합이며 고정 합(2396 등)을 가정하지 않는다.
+    // 릴 한 칸의 전체 가중치. 미스와 심볼 가중치의 합이며 고정 합(v4 2500 등)을 가정하지 않는다.
     public static int TotalWeight(SlotMachineData _table, int _ammoWeightScale)
     {
         if (_table == null || _table.symbols == null)
@@ -99,20 +100,15 @@ public static class SlotMachineInfo
             return outcome;
         }
 
-        var ammo = FindById(_table, AMMO_ID);
-        foreach (int face in _faces)
-        {
-            if (ammo != null && face == ammo.reelIndex)
-            {
-                outcome.hasAmmo = true;
-            }
-        }
-
         if (_faces[0] == _faces[1] && _faces[1] == _faces[2])
         {
             outcome.tripleFace = _faces[0];
             var symbol = FindByFace(_table, _faces[0]);
             outcome.multiplier = symbol != null ? symbol.multiplier : 0;
+            outcome.hasAmmo = symbol != null && symbol.fullAmmo;
+            outcome.partCount = symbol != null ? Mathf.Max(0, symbol.parts) : 0;
+            outcome.nextEraPartCount = symbol != null ? Mathf.Max(0, symbol.nextEraParts) : 0;
+            outcome.isMiss = symbol == null || (outcome.multiplier == 0 && !outcome.hasAmmo && outcome.partCount == 0 && outcome.nextEraPartCount == 0);
             return outcome;
         }
 
@@ -131,6 +127,7 @@ public static class SlotMachineInfo
 
         // 2줄이 맞았지만 지급이 없는 조합은 근접 미스로 본다(효과음 연출용).
         outcome.isNearMiss = outcome.pairFace >= 0 && outcome.multiplier == 0;
+        outcome.isMiss = outcome.multiplier == 0;
         return outcome;
     }
 
@@ -193,6 +190,14 @@ public static class SlotMachineInfo
         {
             Debug.LogError("슬롯머신 spinCost가 음수입니다.");
         }
+        if (_table.spinHealAmount < 0f || float.IsNaN(_table.spinHealAmount) || float.IsInfinity(_table.spinHealAmount))
+        {
+            Debug.LogError("슬롯머신 spinHealAmount가 올바르지 않습니다.");
+        }
+        if (_table.heldRewardChance < 0f || _table.heldRewardChance > 1f || _table.missAmmoFraction <= 0f || _table.missAmmoFraction > 1f || _table.fullAmmoCash < 0)
+        {
+            Debug.LogError("슬롯 현물 보상 설정이 올바르지 않습니다.");
+        }
         if (_table.spinSeconds <= 0f)
         {
             Debug.LogError("슬롯머신 spinSeconds는 0보다 커야 합니다.");
@@ -218,7 +223,7 @@ public static class SlotMachineInfo
             {
                 seen[symbol.reelIndex] = true;
             }
-            if (symbol.weight < 0 || symbol.multiplier < 0 || symbol.pairMultiplier < 0)
+            if (symbol.weight < 0 || symbol.multiplier < 0 || symbol.pairMultiplier < 0 || symbol.parts < 0 || symbol.nextEraParts < 0)
             {
                 Debug.LogError($"슬롯머신 심볼 {symbol.id}의 weight 또는 배수가 음수입니다.");
             }
