@@ -55,6 +55,25 @@ public static class ShopInfo
         return result;
     }
 
+    // 다음 시대 = startWave가 _eraId 시대보다 큰 시대 중 가장 이른 것. 마지막 시대이거나 _eraId가 없으면 null이다.
+    public static ShopData.Era NextEra(ShopData _table, string _eraId)
+    {
+        var current = FindEra(_table, _eraId);
+        if (current == null)
+        {
+            return null;
+        }
+        ShopData.Era result = null;
+        foreach (var era in _table.eras)
+        {
+            if (era != null && era.startWave > current.startWave && (result == null || era.startWave < result.startWave))
+            {
+                result = era;
+            }
+        }
+        return result;
+    }
+
     // 무기 판매 해금 여부. 시대 진열은 누적이라 한 번 열린 시대 무기는 계속 판다.
     public static bool IsWeaponUnlocked(ShopData _table, WeaponData.Entry _weapon, int _wave)
     {
@@ -125,19 +144,17 @@ public static class ShopInfo
         return null;
     }
 
-    // 탄약 팩 가격 = 기준 무기 가격 × 비율. 탄약은 시대가 올라가도 남는 돈의 상수 사용처다.
+    // 상점 기본 시간(초). 테이블 미지정(0 이하) 시 GameConfig의 intermissionSeconds를 쓴다.
+    public static float DurationSeconds(ShopData _table) => _table != null ? _table.durationSeconds : 0f;
+
+    // 탄약 충전은 탄종과 현재 잔량에 무관한 고정 가격이다.
     public static int AmmoPackPrice(ShopData _table, ShopData.AmmoPack _pack)
     {
         if (_table == null || _pack == null || _table.ammoPack == null)
         {
             return 0;
         }
-        return Mathf.Max(1, Mathf.RoundToInt(WeaponPrice(_table, _pack.referenceWeaponId) * _table.ammoPack.priceRatio));
-    }
-
-    public static int AmmoPackRounds(ShopData _table)
-    {
-        return _table != null && _table.ammoPack != null ? Mathf.Max(0, _table.ammoPack.rounds) : 0;
+        return Mathf.Max(0, _table.ammoPack.price);
     }
 
     // 탄약 팩 해금 시점 = 그 탄종을 쓰는 무기 중 가장 먼저 해금되는 무기의 시대.
@@ -176,17 +193,6 @@ public static class ShopInfo
     public static int SlotOfferCount(ShopData _table)
     {
         return _table != null && _table.slotUpgrades != null ? Mathf.Max(0, _table.slotUpgrades.offerCount) : 0;
-    }
-
-    public static int HealPrice(ShopData _table)
-    {
-        return _table != null && _table.heal != null ? Mathf.Max(0, _table.heal.price) : 0;
-    }
-
-    // 체력 회복을 살 수 있는지. 체력이 이미 최대면 회복할 것이 없으므로 살 수 없다.
-    public static bool CanHeal(float _current, float _max)
-    {
-        return _max > 0f && _current < _max;
     }
 
     public static bool CanAddAmmo(AmmoInventory _ammo, string _id)
@@ -258,13 +264,9 @@ public static class ShopInfo
         {
             Debug.LogError("상점 가격 반올림 단위·파츠 비율·스탯 가격 성장률이 올바르지 않습니다.");
         }
-        if (_table.ammoPack == null || _table.ammoPack.rounds <= 0 || _table.ammoPack.priceRatio <= 0f)
+        if (_table.ammoPack == null || _table.ammoPack.price <= 0)
         {
-            Debug.LogError("탄약 팩 발수·가격 비율이 올바르지 않습니다.");
-        }
-        if (_table.heal == null || _table.heal.price < 0)
-        {
-            Debug.LogError("체력 회복 가격이 올바르지 않습니다.");
+            Debug.LogError("탄약 전량 충전 가격이 올바르지 않습니다.");
         }
         if (_table.slotUpgrades == null || _table.slotUpgrades.offerCount < 0)
         {

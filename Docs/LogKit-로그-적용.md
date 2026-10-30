@@ -1,6 +1,6 @@
 # LogKit 게임 로그 적용
 
-> POC2(Unity 6000.3.22f1)에 [LogKit](https://github.com/Bo-sung/logkit) v0.3.0을 붙인 방식과 설정법. 마지막 업데이트: 2026-10-30
+> POC2(Unity 6000.3.22f1)에 [LogKit](https://github.com/Bo-sung/logkit) v0.3.0을 붙인 방식과 설정법. 마지막 업데이트: 2026-10-31 (develop 2f80ba0 슬롯 보상·상점 타이밍 반영)
 
 ## 1. 설치 (버전 고정)
 - `POC2/Packages/manifest.json`: `"com.team.logkit": "https://github.com/Bo-sung/logkit.git?path=package#v0.3.0"`
@@ -30,16 +30,16 @@
 | category | message | 주요 data |
 |----------|---------|-----------|
 | Run | RunStarted · GameOver · RunEnded | startMoney·maxHealth·startWeaponId / reason(GameOver·SceneUnloaded·Quit)·balance·totalKills·shots·shotsHit·damageTaken |
-| Wave | WaveStarted · EnemiesCleared · WaveCompleted · IntermissionStarted | 적 구성·시간 / 전멸 시 남은 시간 / 실제 회복·보너스·잔액 / 정비 시간 |
-| Slot | SpinRequested · SpinRejected · SpinStarted · SpinResolved | cost·balance·reason / faces·spinSeconds / multiplier·payout·ammoGranted·잔액·탄약 |
-| Shop | PurchaseSucceeded · PurchaseFailed | itemType(Weapon·Part·Stat·Ammo·Heal·SlotUpgrade)·itemId·reason·price·balanceBefore·balance |
+| Wave | WaveStarted · EnemiesCleared · WaveCompleted · IntermissionStarted | 적 구성·시간 / 전멸 시 남은 시간 / 실제 회복·보너스·잔액 / 정비 시간(`ShopDuration`) |
+| Slot | SpinRequested · SpinRejected · SpinStarted · SpinResolved | cost·balance·reason(Spinning·WaveInactive·InsufficientFunds·ReelsBusy) / faces·spinSeconds·healthRestored(회전 시작 실제 회복)·health / multiplier·payout(배수 현금)·rewardCash·rewardAmmoId·rewardAmmoAmount·ammoRefill·rewardPartIds(실제 지급 현물)·잔액·탄약 |
+| Shop | PurchaseSucceeded · PurchaseFailed | itemType(Weapon·Part·Stat·Ammo·SlotUpgrade)·itemId·reason·price·balanceBefore·balance |
 | Weapon | WeaponBought · WeaponPickedUp · WeaponDropped | weaponId·slot·replacedWeaponId·magazine·reason(Bought·PickupSwap) |
 | Combat | Shot · Hit · EnemyKilled | shotId·weaponId·hand·pellets·탄약 / 실제 투사체 피해·headshot·killed / enemyKind·reward·처치 수 |
 | Player | PlayerDamaged | damage(방어 적용 후)·health·maxHealth·lethal |
 | Unity | (Debug.Log 원문) | LogKit 자동 캡처(`captureUnityLogs`) |
 
 지표(Count/Measure, 중복 없이 사건당 1회):
-`RunStart`, `GameOver`, `GameOverWave`(M), `WaveStart`, `WaveClear`, `WaveComplete`, `SlotSpin`, `SlotWin`, `SlotPayout`(M), `ShopPurchase`, `ShopPurchaseFailed`, `ShopSpend`(M), `WeaponPickup`, `Attack`(방아쇠 1회, 산탄 전체 1회), `AttackHit`(적에게 피해를 준 발 — 한 발의 여러 산탄·콜라이더는 1회), `DamageDealt`(M), `Kill`(적 1명 사망 1회), `PlayerDamage`, `PlayerDamageTaken`(M). (M) = Measure
+`RunStart`, `GameOver`, `GameOverWave`(M), `WaveStart`, `WaveClear`, `WaveComplete`, `SlotSpin`, `SlotHeal`(M, 회전 시작 실제 회복), `SlotWin`(배수 현금 당첨), `SlotReward`(현물 지급 있음), `SlotPayout`(M, 배수 현금), `ShopPurchase`, `ShopPurchaseFailed`, `ShopSpend`(M), `WeaponPickup`, `Attack`(방아쇠 1회, 산탄 전체 1회), `AttackHit`(적에게 피해를 준 발 — 한 발의 여러 산탄·콜라이더는 1회), `DamageDealt`(M), `Kill`(적 1명 사망 1회), `PlayerDamage`, `PlayerDamageTaken`(M). (M) = Measure
 
 ## 5. 설정 (`Resources/TelemetryData.json`)
 | 키 | 기본 | 설명 |
@@ -69,8 +69,13 @@
 ```
 Unity.exe -batchmode -nographics -projectPath <POC2> -executeMethod PocTelemetryVerification.RunChecks -logFile <log>
 ```
-실제 Game 씬 플레이: 로거 1개(씬 재시작 후에도), 런 시작·게임 오버·재시작·종료 각각 1회, 웨이브·슬롯·상점 성공/실패·처치·피격 기록, `AttackHit`/`Kill` 중복 방지, `logShotEvents` 억제, 아무도 듣지 않는 localhost 포트로 전송 실패해도 진행·로컬 파일 유지, 종료 flush 후 JSONL·metrics 내용을 확인한다.
-- 배치 모드 기동 때 Unity 에디터 검색 인덱서(`UnityEditor.Search.SearchInit.IndexationOnStartup`)가 `ArgumentOutOfRangeException`을 한 번 던진다. 게임·LogKit 코드와 무관하며 이 검증만 그 스택을 제외한다(기존 `PocWaveRecoveryVerification`·`PocAkimboVerification`은 이 예외 1건을 실패로 센다).
+실제 Game 씬 플레이: 로거 1개(씬 재시작 후에도), 런 시작·게임 오버·재시작·종료 각각 1회, 웨이브·상점 성공/실패·처치·피격 기록, `AttackHit`/`Kill` 중복 방지, `logShotEvents` 억제, 아무도 듣지 않는 localhost 포트로 전송 실패해도 진행·로컬 파일 유지, 종료 flush 후 JSONL·metrics 내용을 확인한다.
+슬롯은 회전 시작 실제 회복량, 회전 중 재진입 거절, 회전 중 웨이브 만료 → 정비(`ShopDuration`) 중 결과 지급 1회, 결과 줄의 `payout + rewardCash`가 실제 소지금 변화와 같은지까지 본다.
+
+최근 결과(2026-10-31, develop 2f80ba0 병합 후 워크트리): `PocTelemetryVerification.RunChecks` exit 0, passes=58 failures=0.
+- 같은 트리 회귀: `PocSlotHealVerification.Run` failures=0, `PocSlotRewardVerification.Run` failures=0, `PocShootingVerification.Run` failures=0, `PocProjectileVerification` failures=0, `PocVerification.RunUnitChecks` failures=0, `PocWaveRecoveryVerification.RunChecks` passes=55 / exit 1(실패 1건은 아래 에디터 Search 기동 예외, FAIL 체크 0건).
+- develop의 `PocSlotRewardVerification`은 `[InitializeOnLoad]` + `delayCall`로 플레이 진입 리로드 때도 모델 검사를 돌려 `OnSpinStopped`를 직접 부른다. 그 결과 실제 회전 전 `Slot/SpinResolved` 1줄(wave 0)이 JSONL에 남는다. 검증은 이를 따로 세어 로그로 보고하고 실제 회전(SpinStarted 이후)만 판정한다.
+- 배치 모드 기동 때 Unity 에디터 검색 인덱서(`UnityEditor.Search.SearchInit.IndexationOnStartup`)가 `ArgumentOutOfRangeException`을 한 번 던진다. 게임·LogKit 코드와 무관하며 이 검증만 그 스택을 제외한다(기존 `PocWaveRecoveryVerification`·`PocAkimboVerification`은 이 예외 1건을 실패로 센다). 예외 자체는 CLI 로그와 JSONL(`Unity` 카테고리)에 그대로 남는다.
 
 ## 7. 제약
 - LogKit `GameLogger`는 정적 상태를 도메인 리로드로 초기화한다. Enter Play Mode에서 **Reload Domain을 끄면** 두 번째 플레이부터 로거가 생성되지 않을 수 있다(현재 설정은 리로드함).

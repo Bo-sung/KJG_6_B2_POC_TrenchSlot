@@ -26,6 +26,9 @@ public static class PocTelemetryVerification
     private const string EXPECTED_KILLS = "PocTelemetryVerification.kills";
     private const string EXPECTED_ATTACKS = "PocTelemetryVerification.attacks";
     private const string EXPECTED_HITS = "PocTelemetryVerification.hits";
+    private const string SHOP_DURATION = "PocTelemetryVerification.shopDuration";
+    private const string SPIN_BALANCE_DELTA = "PocTelemetryVerification.spinDelta";
+    private const string BOUGHT_STAT = "PocTelemetryVerification.stat";
     private const string EXPECTED_SHOT_LINES = "PocTelemetryVerification.shotLines";
     private const string TAG = "[PocTelemetryVerification]";
     private static readonly Stack<IEnumerator> STEPS = new Stack<IEnumerator>();
@@ -169,15 +172,6 @@ public static class PocTelemetryVerification
         player.ApplyDamage(10f);
         Check(Mathf.Approximately((float)StaticField(typeof(GameTelemetry), "damageTaken"), 10f), "player damage recorded");
 
-        // 슬롯: 비용 차감·결과까지.
-        game.Wallet.Add(1000);
-        int spinsBefore = 0;
-        slot.SpinResolved += (_outcome, _paid, _text) => spinsBefore++;
-        slot.Interact();
-        Check(slot.IsSpinning && InputGate.PlayerEnabled, "slot spin starts without input lock");
-        yield return Wait(() => !slot.IsSpinning, 10f, "slot spin resolves");
-        Check(spinsBefore == 1, "slot resolved once");
-
         // 서버 없는 전송 시도: 아무도 듣지 않는 localhost 포트로 주기 전송을 켜도 게임은 계속된다.
         int deadPort = FreePort();
         GameLogger.Configure(developmentServerUrl: $"http://127.0.0.1:{deadPort}/api/logs", uploadOnQuit: true, uploadIntervalSeconds: 1f, requestTimeoutSeconds: 1);
@@ -185,13 +179,34 @@ public static class PocTelemetryVerification
         yield return Frames(120);
         Check(Time.realtimeSinceStartup - frameStart < 10f && game.Phase == GameManager.GamePhase.Wave, "failed uploads do not stall gameplay frames");
 
-        // 정비: 회복·지급 + 상점 성공/실패.
+        // 슬롯: 회전 시작 회복(실제 회복량) → 회전 중 웨이브 만료 → 정비 중 결과 지급(현금·현물)까지.
+        game.Wallet.Add(1000);
+        player.ApplyDamage(30f);
+        int spinsResolved = 0;
+        slot.SpinResolved += (_outcome, _paid, _text) => spinsResolved++;
+        float healthBeforeSpin = player.CurrentHealth;
+        slot.Interact();
+        float expectedSpinHeal = Mathf.Min(SlotMachineInfo.SpinHealAmount(TableManager.Instance.SlotMachine), player.MaxHealth - healthBeforeSpin);
+        Check(slot.IsSpinning && InputGate.PlayerEnabled, "slot spin starts without input lock");
+        Check(Mathf.Approximately(player.CurrentHealth - healthBeforeSpin, expectedSpinHeal), $"spin start heals actual {expectedSpinHeal}");
+        slot.Interact();
+        Check(spinsResolved == 0, "re-entering Interact while spinning does not start a second spin");
+
+        // 정비: 시간 만료 회복·지급 + 상점 성공/실패.
         Set(game, "waveTimeLeft", 0.001f);
         yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 2f, "wave completes into shop");
+        Check(Mathf.Approximately(game.IntermissionLeft, game.ShopDuration) || game.IntermissionLeft < game.ShopDuration, "shop timer starts from ShopDuration");
+        SessionState.SetFloat(SHOP_DURATION, game.ShopDuration);
+        Check(slot.IsSpinning, "slot spin still in flight when shop opens");
+        int balanceBeforeResolve = game.Wallet.Balance;
+        yield return Wait(() => !slot.IsSpinning, 10f, "in-flight slot spin resolves during shop");
+        Check(spinsResolved == 1 && game.Phase == GameManager.GamePhase.Shop, "slot resolved once in shop");
+        SessionState.SetInt(SPIN_BALANCE_DELTA, game.Wallet.Balance - balanceBeforeResolve);
         Check(game.TryBuyWeapon("mp18", 0) != "", "locked weapon purchase fails with reason");
         game.Wallet.Add(1000);
-        player.ApplyDamage(40f);
-        Check(game.TryBuyHeal() == "", "heal purchase succeeds");
+        var stat = TableManager.Instance.Shop.stats[0];
+        Check(game.TryBuyStat(stat.id) == "", $"stat purchase {stat.id} succeeds");
+        SessionState.SetString(BOUGHT_STAT, stat.id);
 
         // 게임 오버 → 같은 씬 재시작(중복 로거·중복 구독 없음).
         int expectedHits = (int)StaticField(typeof(GameTelemetry), "shotsHit");
@@ -247,14 +262,30 @@ public static class PocTelemetryVerification
         Check(CountOf("Combat", "Shot") == SessionState.GetInt(EXPECTED_SHOT_LINES, -1), "Shot lines respect logShotEvents");
         Check(CountOf("Combat", "Hit") >= 2, "Hit detail lines recorded per damaging impact");
         Check(CountOf("Player", "PlayerDamaged") >= 2, "player damage recorded");
-        Check(CountOf("Slot", "SpinRequested") == 1 && CountOf("Slot", "SpinStarted") == 1 && CountOf("Slot", "SpinResolved") == 1,
-            "slot request/start/result recorded once");
+        // develop의 PocSlotRewardVerification([InitializeOnLoad] delayCall)은 플레이 진입 리로드 때도 모델 검사로 OnSpinStopped를 직접 부른다.
+        // 그 하네스 결과는 실제 회전(SpinStarted) 이전 줄이므로 따로 세어 보고하고, 실제 회전 결과는 SpinStarted 이후 줄만 본다.
+        int spinStartIndex = entries.FindIndex(_e => _e.category == "Slot" && _e.message == "SpinStarted");
+        int harnessResolved = entries.Take(Math.Max(0, spinStartIndex)).Count(_e => _e.category == "Slot" && _e.message == "SpinResolved");
+        Debug.Log($"{TAG} SpinResolved lines before the real spin (other editor verification harness): {harnessResolved}");
+        var realResolved = entries.Skip(spinStartIndex + 1).Where(_e => _e.category == "Slot" && _e.message == "SpinResolved").ToList();
+        Check(CountOf("Slot", "SpinRequested") == 1 && CountOf("Slot", "SpinStarted") == 1 && realResolved.Count == 1,
+            "slot request/start/result recorded once for the real spin");
         var spin = JsonUtility.FromJson<SlotSpinStartedEvent>(entries.First(_e => _e.message == "SpinStarted").dataJson);
         Check(spin.cost > 0 && spin.faces != null && spin.faces.Length == SlotMachineInfo.REEL_COUNT, "spin data has cost and faces");
+        Check(spin.healthRestored > 0f && spin.health > 0f, "spin start records actual heal and health");
+        var resolved = JsonUtility.FromJson<SlotSpinResolvedEvent>(realResolved.First().dataJson);
+        Check(resolved.payout + resolved.rewardCash == SessionState.GetInt(SPIN_BALANCE_DELTA, -1),
+            $"spin result cash (payout {resolved.payout} + reward {resolved.rewardCash}) matches real wallet delta");
+        Check(resolved.rewardPartIds != null && (resolved.rewardAmmoAmount >= 0) && resolved.wave == spin.wave,
+            $"spin result records goods (ammo {resolved.rewardAmmoId} x{resolved.rewardAmmoAmount}, parts {resolved.rewardPartIds?.Length}) with spin wave");
+        var intermission = JsonUtility.FromJson<IntermissionStartedEvent>(entries.First(_e => _e.message == "IntermissionStarted").dataJson);
+        Check(Mathf.Approximately(intermission.intermissionSeconds, SessionState.GetFloat(SHOP_DURATION, -1f)), "IntermissionStarted uses ShopDuration");
         var failed = entries.Where(_e => _e.message == "PurchaseFailed").Select(_e => JsonUtility.FromJson<ShopPurchaseEvent>(_e.dataJson)).ToList();
         Check(failed.Any(_p => _p.itemId == "mp18" && _p.reason.Length > 0 && _p.price == 0), "failed purchase keeps reason and zero price");
         var bought = entries.Where(_e => _e.message == "PurchaseSucceeded").Select(_e => JsonUtility.FromJson<ShopPurchaseEvent>(_e.dataJson)).ToList();
-        Check(bought.Any(_p => _p.itemType == "Heal" && _p.price > 0 && _p.balance == _p.balanceBefore - _p.price), "successful purchase records price and balance");
+        Check(bought.Any(_p => _p.itemType == "Stat" && _p.itemId == SessionState.GetString(BOUGHT_STAT, "") && _p.price > 0 && _p.balance == _p.balanceBefore - _p.price),
+            "successful purchase records price and balance");
+        Check(entries.All(_e => _e.dataJson.IndexOf("\"itemType\":\"Heal\"", StringComparison.Ordinal) < 0), "no removed heal-shop purchase events");
         Check(entries.Any(_e => _e.category == "Unity" && _e.message.Contains("unity console capture probe")), "Unity Debug.Log auto capture");
         Check(entries.All(_e => _e.level != "Exception" || IsEditorSearchNoise(_e.stackTrace)), "no gameplay exceptions captured during play");
 
@@ -268,6 +299,7 @@ public static class PocTelemetryVerification
         Check(Metric(GameTelemetry.METRIC_KILL) == SessionState.GetInt(EXPECTED_KILLS, -1), "Kill metric deduplicated per enemy");
         Check(Metric(GameTelemetry.METRIC_RUN_START) == 2 && Metric(GameTelemetry.METRIC_GAME_OVER) == 1, "run metrics");
         Check(Metric(GameTelemetry.METRIC_PLAYER_DAMAGE) >= 2 && Metric(GameTelemetry.METRIC_SLOT_SPIN) == 1, "player damage and slot metrics");
+        Check(metrics.Any(_m => _m.key == GameTelemetry.METRIC_SLOT_HEAL && _m.count == 1 && _m.sum > 0d), "SlotHeal metric measures actual spin heal");
         Check(File.Exists(sessionFile.FullName), "failed upload to absent server keeps local JSONL for retry");
     }
 

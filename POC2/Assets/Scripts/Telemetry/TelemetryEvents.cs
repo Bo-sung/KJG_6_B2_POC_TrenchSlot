@@ -87,14 +87,23 @@ public sealed class SlotSpinStartedEvent : TelemetryEvent
     public int balance;
     public float spinSeconds;
     public int[] faces;
+    // 회전 시작 시 실제 회복량(최대 체력에서 잘린 값)과 회복 후 체력.
+    public float healthRestored;
+    public float health;
 }
 
 [Serializable]
 public sealed class SlotSpinResolvedEvent : TelemetryEvent
 {
     public int multiplier;
+    // 배수 당첨 현금(퍽·저금통 적용).
     public int payout;
-    public bool ammoGranted;
+    // 현물 보상(SlotRewardInfo.Apply로 실제 지급된 계획). 현금 대체·탄약·파츠.
+    public int rewardCash;
+    public string rewardAmmoId;
+    public int rewardAmmoAmount;
+    public bool ammoRefill;
+    public string[] rewardPartIds;
     public bool nearMiss;
     public float piggyMultiplier;
     public int balance;
@@ -105,7 +114,7 @@ public sealed class SlotSpinResolvedEvent : TelemetryEvent
 [Serializable]
 public sealed class ShopPurchaseEvent : TelemetryEvent
 {
-    // Weapon · Part · Stat · Ammo · Heal · SlotUpgrade
+    // Weapon · Part · Stat · Ammo · SlotUpgrade
     public string itemType;
     public string itemId;
     public bool success;

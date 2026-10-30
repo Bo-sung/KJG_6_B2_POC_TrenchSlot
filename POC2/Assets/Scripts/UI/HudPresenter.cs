@@ -18,6 +18,7 @@ public sealed class HudPresenter : MonoBehaviour
     private string interactionPrompt;
     private string pickupPrompt;
     private AmmoInventory ammoInventory;
+    private bool enemiesCleared;
 
     private void Start()
     {
@@ -59,11 +60,14 @@ public sealed class HudPresenter : MonoBehaviour
         if (slot != null)
         {
             slot.SpinResolved += OnSpinResolved;
+            slot.SpinHealed += OnSpinHealed;
         }
         if (weapon != null)
         {
             weapon.EnemyImpact += OnEnemyImpact;
             weapon.AmmoChanged += OnAmmoChanged;
+            weapon.AimChanged += OnAimChanged;
+            OnAimChanged(weapon.IsAiming);
             RefreshAmmo();
         }
         if (gameManager != null && gameManager.CurrentWave.wave > 0)
@@ -103,11 +107,13 @@ public sealed class HudPresenter : MonoBehaviour
         if (slot != null)
         {
             slot.SpinResolved -= OnSpinResolved;
+            slot.SpinHealed -= OnSpinHealed;
         }
         if (weapon != null)
         {
             weapon.EnemyImpact -= OnEnemyImpact;
             weapon.AmmoChanged -= OnAmmoChanged;
+            weapon.AimChanged -= OnAimChanged;
         }
     }
 
@@ -133,6 +139,11 @@ public sealed class HudPresenter : MonoBehaviour
     private void OnAmmoChanged(int _ammo, int _magazine)
     {
         RefreshAmmo();
+    }
+
+    private void OnAimChanged(bool _aiming)
+    {
+        if (view != null) view.SetCrosshairVisible(!_aiming);
     }
 
     private void OnReserveChanged(string _id, int _reserve, int _maximum)
@@ -248,6 +259,7 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void OnWaveStarted(WaveSpec _spec)
     {
+        enemiesCleared = false;
         view.SetWave(_spec.wave, _spec.era);
         view.ShowBanner($"WAVE {_spec.wave} 시작");
         SoundPlayer.Play(SfxType.WaveStart);
@@ -255,11 +267,13 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void OnWaveTimeChanged(float _left, float _total)
     {
-        view.SetTimer(_left);
+        string status = enemiesCleared ? "적 전멸 · 슬롯 정비" : "WAVE 남은 시간";
+        view.SetTimer(_left, _total, status);
     }
 
     private void OnEnemiesCleared(float _remainingSeconds)
     {
+        enemiesCleared = true;
         view.ShowBanner($"전멸! 남은 {Mathf.CeilToInt(_remainingSeconds)}초 동안 슬롯 회전 가능");
         SoundPlayer.Play(SfxType.WaveClear);
     }
@@ -277,5 +291,10 @@ public sealed class HudPresenter : MonoBehaviour
     private void OnSpinResolved(SlotOutcome _outcome, int _payout, string _text)
     {
         view.ShowResult(_text);
+    }
+
+    private void OnSpinHealed(float _amount)
+    {
+        if (view != null) view.ShowResult($"체력 +{_amount:0.#}");
     }
 }

@@ -72,6 +72,15 @@ public sealed class GameManager : MonoBehaviour
     public WaveSpec CurrentWave => currentWave;
     public float WaveTimeLeft => waveTimeLeft;
     public float IntermissionLeft => intermissionLeft;
+    public float ShopDuration
+    {
+        get
+        {
+            var shop = TableManager.Instance.Shop;
+            float duration = ShopInfo.DurationSeconds(shop);
+            return duration > 0f ? duration : GameConfigInfo.IntermissionSeconds(TableManager.Instance.GameConfig);
+        }
+    }
     public int KillsThisWave => killsThisWave;
     public int TotalKills => totalKills;
     public PlayerWallet Wallet => wallet;
@@ -86,8 +95,6 @@ public sealed class GameManager : MonoBehaviour
     public bool IsAkimbo => loadout != null && loadout.Akimbo;
     // 지금 아킴보를 켤 수 있는지. 이미 켜져 있으면 false다.
     public bool CanAkimbo => !IsAkimbo && AkimboUnavailableReason == "";
-    // 지금 체력 회복을 살 수 있는지(살아 있고 최대 체력 미만). 상점 칸 활성 상태와 구매 판정이 같이 쓴다.
-    public bool CanHeal => playerHealth != null && playerHealth.IsAlive && ShopInfo.CanHeal(playerHealth.CurrentHealth, playerHealth.MaxHealth);
     public float CurrentHealth => playerHealth != null ? playerHealth.CurrentHealth : 0f;
     public float MaxHealth => playerHealth != null ? playerHealth.MaxHealth : 0f;
 
@@ -206,7 +213,7 @@ public sealed class GameManager : MonoBehaviour
             return;
         }
 
-        if (phase == GamePhase.Shop && GameConfigInfo.IntermissionSeconds(TableManager.Instance.GameConfig) > 0f)
+        if (phase == GamePhase.Shop && ShopDuration > 0f)
         {
             intermissionLeft = Mathf.Max(0f, intermissionLeft - Time.deltaTime);
             IntermissionChanged?.Invoke(intermissionLeft);
@@ -263,7 +270,7 @@ public sealed class GameManager : MonoBehaviour
         slotOffers.OnWaveEnded();
         GameTelemetry.WaveCompleted(WaveHealthRestored, WaveBonusPaid, wallet.Balance, playerHealth.CurrentHealth, killsThisWave);
         WaveEnded?.Invoke(currentWave.wave);
-        intermissionLeft = GameConfigInfo.IntermissionSeconds(config);
+        intermissionLeft = ShopDuration;
         SetPhase(GamePhase.Shop);
         GameTelemetry.IntermissionStarted(intermissionLeft, wallet.Balance);
         IntermissionChanged?.Invoke(intermissionLeft);
@@ -842,31 +849,49 @@ public sealed class GameManager : MonoBehaviour
         return ammoShop.TryBuy(_ammoId);
     }
 
-    public string TryBuyHeal()
+    // 회전 결과의 현물 계획. 시대·해금은 회전이 시작된 웨이브(_spinWave) 기준이다. 실제 지급은 SlotRewardInfo.Apply가 한다.
+    public SlotRewardInfo.Reward PlanSlotReward(int _spinWave, SlotOutcome _outcome)
     {
-        int balanceBefore = wallet.Balance;
-        string failure = BuyHeal();
-        GameTelemetry.ShopPurchase("Heal", "heal", failure, balanceBefore, wallet.Balance);
-        return failure;
+        var table = TableManager.Instance;
+        var context = new SlotRewardInfo.Context
+        {
+            wave = _spinWave,
+            shop = table.Shop,
+            weapons = table.Weapon,
+            parts = table.Part,
+            ammoTable = table.Ammo,
+            ammo = ammo,
+            carriedWeaponIds = CarriedWeaponIds(),
+        };
+        return SlotRewardInfo.Plan(table.SlotMachine, _outcome, context, () => UnityEngine.Random.value);
     }
 
-    private string BuyHeal()
+    // 휴대 무기(슬롯 순서)의 무기 id. 바닥 무기와 빈 슬롯은 뺀다.
+    private List<string> CarriedWeaponIds()
     {
-        string closed = ShopClosedReason();
-        if (closed != "")
+        var ids = new List<string>();
+        if (loadout == null)
         {
-            return closed;
+            return ids;
         }
-        if (!CanHeal)
+        for (int i = 0; i < loadout.SlotCount; i++)
         {
-            return "체력이 가득 차 있습니다.";
+            var held = loadout.Get(i);
+            if (held != null)
+            {
+                ids.Add(held.WeaponId);
+            }
         }
-        if (!wallet.TrySpend(ShopInfo.HealPrice(TableManager.Instance.Shop)))
-        {
-            return "소지금이 부족합니다.";
-        }
-        playerHealth.Heal(GameConfigInfo.HealAmount(TableManager.Instance.GameConfig));
-        return "";
+        return ids;
+    }
+
+    // 슬롯 회전이 실제로 시작됐을 때만 호출한다. 이미 사망했으면 부활시키지 않는다.
+    public float RecoverForSlotSpin(float _amount)
+    {
+        if (playerHealth == null || !playerHealth.IsAlive || _amount <= 0f) return 0f;
+        float before = playerHealth.CurrentHealth;
+        playerHealth.Heal(_amount);
+        return playerHealth.CurrentHealth - before;
     }
 
     // 슬롯 업그레이드 진열 칸 구매. 산 칸은 다음 갱신까지 빈 칸으로 남는다.

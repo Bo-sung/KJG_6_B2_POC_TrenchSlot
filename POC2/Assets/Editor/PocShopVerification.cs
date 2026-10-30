@@ -45,7 +45,8 @@ public static class PocShopVerification
         Check(ShopInfo.StatPrice(shop, maxHealth, 0) == 100 && ShopInfo.StatPrice(shop, maxHealth, 1) == 250 && ShopInfo.StatPrice(shop, maxHealth, 2) == 625, "최대 체력 가격 100 → 250 → 625");
         Check(ShopInfo.StatPrice(shop, moveSpeed, 1) == 375 && ShopInfo.StatPrice(shop, moveSpeed, 2) % 5 == 0, "스탯 가격은 2.5배씩 오르고 $5 단위로 반올림");
         Check(ShopInfo.PartPrice(shop, PartInfo.Find(table.Part, "win1886_long_tube")) == 50, "파츠 가격 = 무기가 140 × 0.35 → $50");
-        Check(ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "colt45")) == 12 && ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "m792")) == 180, "탄약 팩 = 기준 무기가 × 0.2 (.45 Colt $12, 7.92 $180)");
+        Check(ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "colt45")) == 50 && ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "m792")) == 50, "탄약 전량 충전 = 탄종 무관 고정 $50(기존 상세기획 $200에서 잠정 인하)");
+        Check(ShopInfo.DurationSeconds(shop) == 60f, "상점 기본 시간 테이블화 = 60초");
 
         // 무기 최종 스탯
         var m1873 = WeaponInfo.Find(table.Weapon, "m1873");
@@ -113,10 +114,19 @@ public static class PocShopVerification
         var ammo = new AmmoInventory(table.Ammo);
         var wallet = new PlayerWallet(100);
         var ammoShop = new AmmoShop(shop, ammo, wallet);
-        int reserve = ammo.GetReserve("colt45");
-        Check(ammoShop.TryBuy("colt45") == "" && ammo.GetReserve("colt45") == reserve + 125 && wallet.Balance == 88, "탄약 팩은 125발을 더하고 팩 가격만 낸다");
-        ammo.Add("colt45", 10000);
-        Check(ammoShop.TryBuy("colt45") != "" && wallet.Balance == 88, "최대 예비탄이면 팩을 살 수 없다");
+        int maximum = ammo.GetMaximum("colt45");
+        int before = ammo.GetReserve("colt45");
+        int price = ShopInfo.AmmoPackPrice(shop, ShopInfo.FindAmmoPack(shop, "colt45"));
+        Check(ammoShop.TryBuy("colt45") == "" && ammo.GetReserve("colt45") == maximum && wallet.Balance == 50,
+            $"탄약 충전은 예비탄을 최대량까지 채우고 ${price}만 낸다 (예비 {before} -> {ammo.GetReserve("colt45")}/{maximum})");
+        Check(ammoShop.TryBuy("colt45") != "" && wallet.Balance == 50, "최대 예비탄이면 충전을 살 수 없고 돈도 빠지지 않는다");
+        ammo.Consume("colt45", 1);
+        wallet.TrySpend(10);
+        Check(ammoShop.TryBuy("colt45") != "" && ammo.GetReserve("colt45") == maximum - 1 && wallet.Balance == 40,
+            $"잔액 $40으로는 ${price} 충전을 거절하고 예비탄도 그대로다");
+        wallet.Add(50);
+        Check(ammoShop.TryBuy("colt45") == "" && ammo.GetReserve("colt45") == maximum && wallet.Balance == 40,
+            $"1발 부족이어도 전량 충전 ${price}을 내고 최대치까지 채운다");
 
         // 슬롯 업그레이드 진열
         var perks = new PerkInventory(table.Perk);

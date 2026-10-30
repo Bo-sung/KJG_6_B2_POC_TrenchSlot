@@ -87,6 +87,11 @@ public static class WeaponInfo
         settings.automatic = _entry.automatic;
         settings.pellets = Mathf.Max(1, _entry.pellets);
         settings.spreadDegrees = Mathf.Max(0f, _entry.spreadDegrees);
+        settings.hipSpreadDegrees = Mathf.Max(0f, _entry.hipSpreadDegrees);
+        settings.aimSpreadMultiplier = Mathf.Clamp01(_entry.aimSpreadMultiplier);
+        settings.recoilPitchDegrees = Mathf.Max(0f, _entry.recoilPitchDegrees);
+        settings.recoilYawDegrees = Mathf.Max(0f, _entry.recoilYawDegrees);
+        settings.recoilRecoveryDegreesPerSecond = Mathf.Max(0f, _entry.recoilRecoveryDegreesPerSecond);
         settings.stoppingPower = Mathf.Max(0f, _entry.stoppingPower);
         settings.pelletStoppingPowerCap = Mathf.Max(0f, _entry.pelletStoppingPowerCap);
         settings.knockback = Mathf.Max(0f, _entry.knockback);
@@ -170,6 +175,8 @@ public static class WeaponInfo
             {
                 Debug.LogError($"무기 {weapon.id}의 탄창·연사력·사거리·재장전 값이 올바르지 않습니다.");
             }
+            if (weapon.hipSpreadDegrees < 0f || weapon.aimSpreadMultiplier < 0f || weapon.aimSpreadMultiplier > 1f || weapon.recoilPitchDegrees < 0f || weapon.recoilYawDegrees < 0f || weapon.recoilRecoveryDegreesPerSecond <= 0f)
+                Debug.LogError($"무기 {weapon.id}의 탄 퍼짐 또는 반동 설정이 올바르지 않습니다.");
             if (weapon.pellets <= 0 || weapon.spreadDegrees < 0f || weapon.stoppingPower < 0f || weapon.pelletStoppingPowerCap < 0f ||
                 weapon.knockback < 0f || weapon.moveSpeedMultiplier <= 0f)
             {

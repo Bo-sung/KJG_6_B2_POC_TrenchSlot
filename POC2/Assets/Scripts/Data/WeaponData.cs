@@ -23,9 +23,15 @@ public sealed class WeaponData
         // 탄을 개별 삽입하는 무기는 한 발씩 예비탄을 소비한다.
         public bool reloadPerRound;
         public bool automatic;
-        // 방아쇠 1회당 발사체 수(산탄 수)와 산포 반각(도). 단발 무기는 1과 0이다.
+        // 발사체 수와 산탄 자체의 확산 반각(도). 단발 무기는 탄 퍼짐과 별개로 0이다.
         public int pellets;
         public float spreadDegrees;
+        // 발사마다 적용되는 산포 및 카메라 반동. 플레이 테스트 전 잠정값이다.
+        public float hipSpreadDegrees;
+        public float aimSpreadMultiplier = 1f;
+        public float recoilPitchDegrees;
+        public float recoilYawDegrees;
+        public float recoilRecoveryDegreesPerSecond = 7f;
         // 발당 저지력. 산탄은 발사 1회 합산 상한(pelletStoppingPowerCap)을 둔다. 0이면 상한 없음.
         public float stoppingPower;
         public float pelletStoppingPowerCap;

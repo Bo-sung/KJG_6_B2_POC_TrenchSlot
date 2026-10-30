@@ -29,6 +29,8 @@ public static class GameTelemetry
     public const string METRIC_SLOT_SPIN = "SlotSpin";
     public const string METRIC_SLOT_WIN = "SlotWin";
     public const string METRIC_SLOT_PAYOUT = "SlotPayout";
+    public const string METRIC_SLOT_REWARD = "SlotReward";
+    public const string METRIC_SLOT_HEAL = "SlotHeal";
     public const string METRIC_SHOP_PURCHASE = "ShopPurchase";
     public const string METRIC_SHOP_PURCHASE_FAILED = "ShopPurchaseFailed";
     public const string METRIC_SHOP_SPEND = "ShopSpend";
@@ -281,7 +283,7 @@ public static class GameTelemetry
         WriteSlot("SpinRejected", _cost, _balance, _reason);
     }
 
-    public static void SlotSpinStarted(int _cost, int _balance, float _spinSeconds, int[] _faces)
+    public static void SlotSpinStarted(int _cost, int _balance, float _spinSeconds, int[] _faces, float _healthRestored, float _health)
     {
         if (!Active)
         {
@@ -289,16 +291,20 @@ public static class GameTelemetry
         }
         lastBalance = _balance;
         Count(METRIC_SLOT_SPIN);
+        Measure(METRIC_SLOT_HEAL, _healthRestored);
         Write(CATEGORY_SLOT, "SpinStarted", new SlotSpinStartedEvent
         {
             cost = _cost,
             balance = _balance,
             spinSeconds = _spinSeconds,
-            faces = _faces != null ? (int[])_faces.Clone() : Array.Empty<int>()
+            faces = _faces != null ? (int[])_faces.Clone() : Array.Empty<int>(),
+            healthRestored = _healthRestored,
+            health = _health
         });
     }
 
-    public static void SlotSpinResolved(SlotOutcome _outcome, int _payout, float _piggyMultiplier, int _balance, int _magazine, int _reserve)
+    // _reward는 이미 지급된 현물 계획이다(null이면 현물 없음).
+    public static void SlotSpinResolved(SlotOutcome _outcome, int _payout, float _piggyMultiplier, SlotRewardInfo.Reward _reward, int _balance, int _magazine, int _reserve)
     {
         if (!Active)
         {
@@ -309,12 +315,20 @@ public static class GameTelemetry
         {
             Count(METRIC_SLOT_WIN);
         }
+        if (_reward != null && !_reward.IsEmpty)
+        {
+            Count(METRIC_SLOT_REWARD);
+        }
         Measure(METRIC_SLOT_PAYOUT, _payout);
         Write(CATEGORY_SLOT, "SpinResolved", new SlotSpinResolvedEvent
         {
             multiplier = _outcome.multiplier,
             payout = _payout,
-            ammoGranted = _outcome.hasAmmo,
+            rewardCash = _reward != null ? _reward.cash : 0,
+            rewardAmmoId = _reward != null && _reward.ammoId != null ? _reward.ammoId : "",
+            rewardAmmoAmount = _reward != null ? _reward.ammoAmount : 0,
+            ammoRefill = _reward != null && _reward.ammoRefill,
+            rewardPartIds = _reward != null ? _reward.partIds.ToArray() : Array.Empty<string>(),
             nearMiss = _outcome.isNearMiss,
             piggyMultiplier = _piggyMultiplier,
             balance = _balance,

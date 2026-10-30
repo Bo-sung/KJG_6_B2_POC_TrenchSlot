@@ -82,7 +82,7 @@ public static class PocSceneBuilder
         var damageFlash = PocAssetBuilder.Panel(root, "DamageFlash", new Color(0.8f, 0.05f, 0.05f, 0f));
         damageFlash.raycastTarget = false;
 
-        PocAssetBuilder.Label(root, "Crosshair", "+", 48, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(80f, 80f));
+        var crosshair = PocAssetBuilder.Label(root, "Crosshair", "+", 48, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(80f, 80f));
         var hitObject = PocAssetBuilder.UiObject("HitMarker", root);
         var hitGroup = hitObject.AddComponent<CanvasGroup>();
         hitGroup.alpha = 0f;
@@ -101,8 +101,17 @@ public static class PocSceneBuilder
         fill.fillMethod = Image.FillMethod.Horizontal;
         PocAssetBuilder.Stretch(fill.rectTransform);
 
-        var wave = PocAssetBuilder.Label(root, "Wave", "WAVE 1", 44, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(800f, 60f));
-        var timer = PocAssetBuilder.Label(root, "Timer", "0초", 40, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(400f, 50f));
+        var wave = PocAssetBuilder.Label(root, "Wave", "WAVE 1", 44, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), new Vector2(800f, 54f));
+        var timerBarBg = PocAssetBuilder.Panel(root, "TimerBarBg", new Color(0.12f, 0.14f, 0.18f, 0.85f));
+        PocAssetBuilder.Place(timerBarBg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(460f, 14f));
+        var timerFillObject = PocAssetBuilder.UiObject("TimerFill", timerBarBg.transform);
+        var timerFill = timerFillObject.AddComponent<Image>();
+        timerFill.color = new Color(0.25f, 0.75f, 1f);
+        timerFill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        timerFill.type = Image.Type.Filled;
+        timerFill.fillMethod = Image.FillMethod.Horizontal;
+        PocAssetBuilder.Stretch(timerFill.rectTransform);
+        var timer = PocAssetBuilder.Label(root, "Timer", "0초", 28, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -118f), new Vector2(600f, 36f));
         var money = PocAssetBuilder.Label(root, "Money", "소지금", 40, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(600f, 50f));
         var kills = PocAssetBuilder.Label(root, "Kills", "처치 0", 32, TextAlignmentOptions.Right, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -100f), new Vector2(600f, 40f));
         var ammo = PocAssetBuilder.Label(root, "Ammo", "-- / --", 56, TextAlignmentOptions.Left, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(600f, 140f));
@@ -122,11 +131,13 @@ public static class PocSceneBuilder
         PocAssetBuilder.Place(resultObject.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(1200f, 80f));
 
         var so = new SerializedObject(view);
+        so.FindProperty("crosshair").objectReferenceValue = crosshair;
         so.FindProperty("healthText").objectReferenceValue = health;
         so.FindProperty("healthFill").objectReferenceValue = fill;
         so.FindProperty("moneyText").objectReferenceValue = money;
         so.FindProperty("waveText").objectReferenceValue = wave;
         so.FindProperty("timerText").objectReferenceValue = timer;
+        so.FindProperty("timerFill").objectReferenceValue = timerFill;
         so.FindProperty("ammoText").objectReferenceValue = ammo;
         so.FindProperty("killsText").objectReferenceValue = kills;
         so.FindProperty("promptText").objectReferenceValue = prompt;

@@ -1,7 +1,7 @@
 using System;
 
 // Resources/ShopData.json의 직렬화 자료. 로직 없음. 조회·가격 계산은 ShopInfo가 담당한다.
-// 상점은 무기(시대 누적)·파츠(무기 종속)·스탯(고정, 구매 횟수별 가격 상승)·보급(탄약 팩·체력)·슬롯 업그레이드(랜덤 진열)로 나뉜다.
+// 상점은 무기(시대 누적)·파츠(무기 종속)·스탯(고정, 구매 횟수별 가격 상승)·보급(탄약 전량 충전)·슬롯 업그레이드(랜덤 진열)로 나뉜다. 체력 회복은 슬롯 회전이 맡는다.
 [Serializable]
 public sealed class ShopData
 {
@@ -33,12 +33,11 @@ public sealed class ShopData
         public float value;
     }
 
-    // 탄약 팩 1개 = rounds발, 가격 = 기준 무기 가격 × priceRatio.
+    // 한 탄종 예비탄을 전량 충전하는 고정 가격.
     [Serializable]
     public sealed class AmmoPackSettings
     {
-        public int rounds;
-        public float priceRatio;
+        public int price;
     }
 
     [Serializable]
@@ -47,13 +46,6 @@ public sealed class ShopData
         public string ammoId;
         // 가격 기준 무기. 해당 탄종 등장 시점의 최고가 무기로 고정한다(물가 안정).
         public string referenceWeaponId;
-    }
-
-    [Serializable]
-    public sealed class Heal
-    {
-        public string label;
-        public int price;
     }
 
     [Serializable]
@@ -73,6 +65,7 @@ public sealed class ShopData
 
     public string status;
     public string note;
+    public float durationSeconds;
     public int priceRounding;
     public Era[] eras = Array.Empty<Era>();
     public WeaponOffer[] weapons = Array.Empty<WeaponOffer>();
@@ -82,6 +75,5 @@ public sealed class ShopData
     public Stat[] stats = Array.Empty<Stat>();
     public AmmoPackSettings ammoPack = new AmmoPackSettings();
     public AmmoPack[] ammoPacks = Array.Empty<AmmoPack>();
-    public Heal heal = new Heal();
     public SlotUpgradeSettings slotUpgrades = new SlotUpgradeSettings();
 }
