@@ -75,6 +75,10 @@ public sealed class PlayerWeapon : MonoBehaviour
     private WeaponInstance current;
     private AmmoInventory inventory;
     private InputAction[] slotInputs = Array.Empty<InputAction>();
+    private InputAction aimInput;
+    private float normalFieldOfView;
+    private GameConfigData aimConfig;
+    public bool IsAiming { get; private set; }
 
     public string AmmoId { get; private set; }
     public int ReserveAmmo => inventory != null ? inventory.GetReserve(AmmoId) : 0;
@@ -173,6 +177,9 @@ public sealed class PlayerWeapon : MonoBehaviour
             fallbackAmmo = Mathf.Max(0, settings.magazineSize);
         }
         ResolveSlotInputs();
+        aimInput = fireAction != null && fireAction.action != null ? fireAction.action.actionMap?.FindAction("Aim") : null;
+        if (aimCamera != null) normalFieldOfView = aimCamera.fieldOfView;
+        aimConfig = TableManager.Instance.GameConfig;
     }
 
     private void OnEnable()
@@ -180,6 +187,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         fireAction?.action?.Enable();
         reloadAction?.action?.Enable();
         pickupAction?.action?.Enable();
+        aimInput?.Enable();
         foreach (var input in slotInputs)
         {
             input?.Enable();
@@ -189,9 +197,11 @@ public sealed class PlayerWeapon : MonoBehaviour
     private void OnDisable()
     {
         CancelReload();
+        ResetAim();
         fireAction?.action?.Disable();
         reloadAction?.action?.Disable();
         pickupAction?.action?.Disable();
+        aimInput?.Disable();
         foreach (var input in slotInputs)
         {
             input?.Disable();
@@ -215,6 +225,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         if (health != null && !health.IsAlive)
         {
             CancelReload();
+            ResetAim();
             return;
         }
 
@@ -222,8 +233,11 @@ public sealed class PlayerWeapon : MonoBehaviour
         if (!InputGate.PlayerEnabled)
         {
             CancelReload();
+            ResetAim();
             return;
         }
+
+        UpdateAim(aimInput != null && aimInput.IsPressed(), Time.deltaTime);
 
         // 끝난 재장전을 먼저 완료한다. 같은 프레임의 슬롯 전환이 다 된 재장전을 취소하지 않게 한다.
         if (isReloading && Time.time >= reloadEndTime)
@@ -267,6 +281,7 @@ public sealed class PlayerWeapon : MonoBehaviour
     // 아킴보였다면 풀린다.
     public void Configure(WeaponInstance _weapon, WeaponSettings _settings, AmmoInventory _inventory, string _ammoId)
     {
+        ResetAim();
         isReloading = false;
         akimbo = false;
         offHand = null;
@@ -292,6 +307,7 @@ public sealed class PlayerWeapon : MonoBehaviour
             return;
         }
         akimbo = true;
+        ResetAim();
         offHand = _off;
         offSettings = _offSettings;
         akimboReloadMultiplier = Mathf.Max(0f, _reloadMultiplier);
@@ -384,6 +400,23 @@ public sealed class PlayerWeapon : MonoBehaviour
             seconds = Mathf.Max(seconds, Mathf.Max(0f, offSettings.reloadSeconds)) * akimboReloadMultiplier;
         }
         return seconds;
+    }
+
+    // 조준은 유지 입력이며 아킴보·입력 차단·사망 중에는 허용하지 않는다.
+    private void UpdateAim(bool _pressed, float _deltaTime)
+    {
+        IsAiming = _pressed && !akimbo && InputGate.PlayerEnabled && (health == null || health.IsAlive) && aimCamera != null;
+        if (aimCamera == null || normalFieldOfView <= 0f) return;
+        float ratio = GameConfigInfo.AimFovRatio(aimConfig);
+        float target = IsAiming ? normalFieldOfView * ratio : normalFieldOfView;
+        float speed = normalFieldOfView * (1f - ratio) / GameConfigInfo.AimTransitionSeconds(aimConfig);
+        aimCamera.fieldOfView = Mathf.MoveTowards(aimCamera.fieldOfView, target, speed * Mathf.Max(0f, _deltaTime));
+    }
+
+    private void ResetAim()
+    {
+        IsAiming = false;
+        if (aimCamera != null && normalFieldOfView > 0f) aimCamera.fieldOfView = normalFieldOfView;
     }
 
     // 기존 재장전 시간은 빈 탄창 전체 기준. 단발 삽입 시 한 발당 시간으로 나눈다.

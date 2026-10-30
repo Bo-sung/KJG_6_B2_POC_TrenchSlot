@@ -24,4 +24,7 @@ public sealed class GameConfigData
     public float crouchCameraSmoothSeconds = 0.12f;
     public float damageDirectionHoldSeconds = 0.2f;
     public float damageDirectionFadeSeconds = 0.8f;
+    // 조준 시 기본 카메라 시야각의 비율과 전환 시간(초).
+    public float aimFovRatio = 0.7f;
+    public float aimTransitionSeconds = 0.15f;
 }

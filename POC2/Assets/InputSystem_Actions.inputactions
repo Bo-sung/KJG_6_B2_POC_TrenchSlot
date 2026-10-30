@@ -33,6 +33,15 @@
           "initialStateCheck": false
         },
         {
+          "name": "Aim",
+          "type": "Button",
+          "id": "b2d3d3bf-1cbc-4520-a57e-c57152259ac2",
+          "expectedControlType": "Button",
+          "processors": "",
+          "interactions": "",
+          "initialStateCheck": false
+        },
+        {
           "name": "Interact",
           "type": "Button",
           "id": "852140f2-7766-474d-8707-702459ba45f3",
@@ -106,6 +115,17 @@
         }
       ],
       "bindings": [
+        {
+          "name": "",
+          "id": "11b1647d-8e52-4b53-a646-738d775f6f48",
+          "path": "<Mouse>/rightButton",
+          "interactions": "",
+          "processors": "",
+          "groups": ";Keyboard&Mouse",
+          "action": "Aim",
+          "isComposite": false,
+          "isPartOfComposite": false
+        },
         {
           "name": "",
           "id": "978bfe49-cc26-4a3d-ab7b-7d7a29327403",

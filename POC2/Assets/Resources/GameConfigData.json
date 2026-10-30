@@ -12,5 +12,7 @@
   "crouchSpeedRatio": 0.5,
   "crouchCameraSmoothSeconds": 0.12,
   "damageDirectionHoldSeconds": 0.2,
-  "damageDirectionFadeSeconds": 0.8
+  "damageDirectionFadeSeconds": 0.8,
+  "aimFovRatio": 0.7,
+  "aimTransitionSeconds": 0.15
 }

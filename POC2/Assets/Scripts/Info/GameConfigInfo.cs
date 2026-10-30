@@ -34,6 +34,8 @@ public static class GameConfigInfo
     public static float CrouchCameraSmoothSeconds(GameConfigData _table) => _table != null && _table.crouchCameraSmoothSeconds > 0f ? _table.crouchCameraSmoothSeconds : 0.12f;
     public static float DamageDirectionHoldSeconds(GameConfigData _table) => _table != null ? Mathf.Max(0f, _table.damageDirectionHoldSeconds) : 0.2f;
     public static float DamageDirectionFadeSeconds(GameConfigData _table) => _table != null && _table.damageDirectionFadeSeconds > 0f ? _table.damageDirectionFadeSeconds : 0.8f;
+    public static float AimFovRatio(GameConfigData _table) => _table != null && _table.aimFovRatio > 0f ? Mathf.Clamp(_table.aimFovRatio, 0.1f, 1f) : 0.7f;
+    public static float AimTransitionSeconds(GameConfigData _table) => _table != null && _table.aimTransitionSeconds > 0f ? _table.aimTransitionSeconds : 0.15f;
 
     public static void Validate(GameConfigData _table)
     {
@@ -49,6 +51,10 @@ public static class GameConfigInfo
         if (_table.crouchHeightRatio <= 0f || _table.crouchHeightRatio >= 1f || _table.crouchSpeedRatio <= 0f || _table.crouchSpeedRatio > 1f || _table.crouchCameraSmoothSeconds <= 0f || _table.damageDirectionHoldSeconds < 0f || _table.damageDirectionFadeSeconds <= 0f)
         {
             Debug.LogError("Crouch / damage direction tuning is invalid.");
+        }
+        if (_table.aimFovRatio <= 0f || _table.aimFovRatio > 1f || _table.aimTransitionSeconds <= 0f)
+        {
+            Debug.LogError("조준 시야각 비율 또는 전환 시간이 올바르지 않습니다.");
         }
         if (_table.startMoney < 0 || _table.healAmount < 0)
         {
