@@ -92,21 +92,24 @@ public sealed class LogSlotCollector : ILogSessionEndObserver
             JToken before = LogJson.CopyPayload(_before);
             JToken faces = LogJson.CopyPayload(_faces);
             JToken symbols = LogJson.CopyPayload(_symbolIds);
-            context = new LogSpinContext(this, _machine, lifecycle.Session.NewId(LogIdKind.Spin), _before, faces, symbols);
-            pending.Add(_machine, context);
-            lifecycle.Session.TryRecord("slot_spin_started", new
+            var candidate = new LogSpinContext(this, _machine, lifecycle.Session.NewId(LogIdKind.Spin), _before, faces, symbols);
+            if (lifecycle.Session.TryRecord("slot_spin_started", new
             {
-                spinId = context.SpinId,
-                originWaveNumber = context.OriginWaveNumber,
-                originPhase = context.OriginPhase,
-                startedElapsedSeconds = context.StartedElapsedSeconds,
+                spinId = candidate.SpinId,
+                originWaveNumber = candidate.OriginWaveNumber,
+                originPhase = candidate.OriginPhase,
+                startedElapsedSeconds = candidate.StartedElapsedSeconds,
                 actualCost = _actualCost,
                 baseCost = _baseCost,
                 spinSeconds = _seconds,
                 faces,
                 symbolIds = symbols,
                 before
-            });
+            }))
+            {
+                context = candidate;
+                pending.Add(_machine, context);
+            }
         });
         return context;
     }

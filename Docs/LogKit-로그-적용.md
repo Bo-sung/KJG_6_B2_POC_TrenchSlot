@@ -16,7 +16,7 @@
 5차의 `LogAmmoCollector`가 탄약 경제를, 6차의 `LogSlotCollector`가 성공한 회전의 spinId·시작/결과·미완료를 소유한다.
 GameManager가 소유하므로 다른 게임 세션의 전역 상태를 참조하지 않는다. 시작 전·종료 후에는 기록하지 않는다.
 현금·탄약·파츠 보상, 실제 슬롯 회복량, 구매 실패, 교체 무기, 탄창 정보가 유지된다.
-구매 금액은 정가가 아닌 실제 잔액 감소량이므로 payload 필드는 `spentAmount`이다.
+구매 금액은 정가가 아닌 관측 구간의 실제 순잔액 감소량이므로 현재 `shop_purchase_result.payload.actualSpent`를 사용한다.
 전투 이벤트에는 조준·아킴보·발사 직후 탄약, 개별 탄의 헤드샷·헬멧·경직 정보를 합쳤다.
 기존 산포·반동·슬롯 보상 게임플레이는 유지한다.
 
@@ -65,4 +65,6 @@ Play Mode를 종료한 뒤 `Tools > POC > Verify Unified Telemetry File`을 실�
 7차에서 LogShopCollector의 offerSetId/revision·구매 attemptId/결과·실제 생성/효과·탄약 원본 참조를 구현했다.
 유료 회복은 현행 상점/API에 없어 복원하지 않았다. 실제 표시 행·스크롤 범위와 직접 API 호출을 구분한다.
 7차 순수 검사 100개와 통합 회귀 330개가 통과했다. 상세는 `Docs/로그-시스템-7차-계약.md` 참조.
-전체 운영 통합 검증은 8차다.
+8차에서 전체 순수 수집기와 실제 FileLogStore를 연결한 통합 검사·파일 읽기 검사·운영 자료를 추가했다.
+현재 요구사항 대응표·파일 해석·실제 Unity 사용자 확인표는 `Docs/로그-시스템-운영-검증.md`, 대표 합성 출력은 `Docs/로그-시스템-8차.synthetic.jsonl`이다.
+위 단계별 결과는 각 차수 당시 기록이며, 8차의 현재 소스 재실행 결과는 `.omo/verification/log-phase8/RESULTS.md`를 기준으로 본다. 실제 Unity 확인은 사용자 대기다.
