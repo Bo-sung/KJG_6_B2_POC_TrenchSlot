@@ -690,6 +690,7 @@ public sealed class PlayerWeapon : MonoBehaviour
         int ammoAfterShot = ammoBeforeShot - ammoConsumed;
         Fired?.Invoke();
         HandFired?.Invoke(hand);
+        heldModels?.PlayFire(hand, 1f / handSettings.shotsPerSecond);
         SoundPlayer.Play(SfxType.Shot);
         Vector3 muzzle = aimCamera.transform.TransformPoint(hand == 0 ? MUZZLE_OFFSET : OFF_HAND_MUZZLE_OFFSET);
         if (hand == 0 && aimAmount > 0f && heldModels != null && heldModels.TryGetAimFront(current, out Vector3 sight))

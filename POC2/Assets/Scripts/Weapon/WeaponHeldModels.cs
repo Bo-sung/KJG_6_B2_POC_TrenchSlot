@@ -15,8 +15,40 @@ public sealed class WeaponHeldModels : MonoBehaviour
     [SerializeField] private Entry[] entries = Array.Empty<Entry>();
     [SerializeField] private Entry[] offHandEntries = Array.Empty<Entry>();
     private string shownId;
+    private string shownOffHandId;
     private Vector3[] initialPositions;
     private Quaternion[] initialRotations;
+
+    // 모든 외형에 사격 동작 재생기를 붙이고, 외형 id에 맞는 부품 동작을 넣는다.
+    private void Awake()
+    {
+        AttachFireMotion(entries);
+        AttachFireMotion(offHandEntries);
+    }
+
+    private static void AttachFireMotion(Entry[] _entries)
+    {
+        foreach (var entry in _entries)
+        {
+            if (entry.model == null) continue;
+            var motion = entry.model.GetComponent<WeaponFireMotion>();
+            if (motion == null) motion = entry.model.AddComponent<WeaponFireMotion>();
+            motion.Setup(WeaponFireMotionTable.Find(entry.id));
+        }
+    }
+
+    // hand 0은 주 외형, hand 1은 아킴보 왼손 외형을 쏜다. 보이는 외형에만 재생한다.
+    public void PlayFire(int _hand, float _shotIntervalSeconds)
+    {
+        var list = _hand == 0 ? entries : offHandEntries;
+        string id = _hand == 0 ? shownId : shownOffHandId;
+        foreach (var entry in list)
+        {
+            if (entry.id != id || entry.model == null || !entry.model.activeInHierarchy) continue;
+            var motion = entry.model.GetComponent<WeaponFireMotion>();
+            if (motion != null) motion.PlayFire(_shotIntervalSeconds);
+        }
+    }
 
     // 게임 시작 위치를 보존하고, 해당 모델의 앞·뒤 조준점을 카메라 시선에 맞춘다.
     public void SetAim(Camera _camera, WeaponInstance _weapon, float _amount)
@@ -124,6 +156,7 @@ public sealed class WeaponHeldModels : MonoBehaviour
     {
         shownId = Has(_id) ? _id : _fallbackId;
         ShowIn(entries, shownId);
+        shownOffHandId = null;
         ShowIn(offHandEntries, null);
     }
 
@@ -132,7 +165,8 @@ public sealed class WeaponHeldModels : MonoBehaviour
     {
         shownId = Has(_id) ? _id : _fallbackId;
         ShowIn(entries, shownId);
-        ShowIn(offHandEntries, HasOffHand(_id) ? _id : _fallbackId);
+        shownOffHandId = HasOffHand(_id) ? _id : _fallbackId;
+        ShowIn(offHandEntries, shownOffHandId);
     }
 
     private static bool Has(Entry[] _entries, string _id)
