@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 // 카메라 정면 거리 안의 대상을 찾아 안내 문구를 알린다.
-// E(interactAction)는 IInteractable을, 픽업 키(pickupAction)는 WeaponPickup을 대상으로 한다. 두 프롬프트는 서로 독립이다.
+// F(interactAction)는 IInteractable을, 픽업 키(pickupAction)는 WeaponPickup을 대상으로 한다. 두 프롬프트는 서로 독립이다.
 public sealed class PlayerInteractor : MonoBehaviour
 {
     [SerializeField] private InputActionReference interactAction;

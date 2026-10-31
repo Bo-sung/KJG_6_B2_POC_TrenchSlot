@@ -5,9 +5,8 @@ public static class LogUnityAdapter
     public static LogSession CreateSession()
     {
         LogData settings = LogInfo.Copy(TableManager.Instance.Log);
-        string persistentDataPath = Application.persistentDataPath;
         double initialFixedDeltaTime = Time.fixedDeltaTime;
-        return new LogSession(settings, _id => new FileLogStore(persistentDataPath, _id),
+        return new LogSession(settings, _id => new LogKitStore(),
             _warning: _message => Debug.LogWarning(_message), _initialFixedDeltaTime: initialFixedDeltaTime);
     }
 

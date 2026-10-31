@@ -30,6 +30,7 @@ public sealed class ShopView : MonoBehaviour
     [SerializeField] private TMP_Text inventoryText;
     [SerializeField] private TMP_Text akimboNoteText;
     [SerializeField] private TMP_Text weaponDetailText;
+    [SerializeField] private Image weaponImage;
     [SerializeField] private TMP_Text partDetailText;
     [SerializeField] private Button nextWaveButton;
     [SerializeField] private ScrollRect[] scrolls = Array.Empty<ScrollRect>();
@@ -606,6 +607,17 @@ public sealed class ShopView : MonoBehaviour
     public void SetWeaponDetail(string _text)
     {
         SetText(weaponDetailText, _text);
+    }
+
+    // 선택 무기 이미지. 이미지가 없으면 칸을 숨긴다.
+    public void SetWeaponImage(Sprite _sprite)
+    {
+        if (weaponImage == null)
+        {
+            return;
+        }
+        weaponImage.sprite = _sprite;
+        weaponImage.gameObject.SetActive(_sprite != null);
     }
 
     public void SetWeaponRow(int _index, string _label, string _price, bool _interactable, bool _selected)

@@ -127,14 +127,13 @@ public sealed partial class ShopPresenter
     private LogShopOffer[] CaptureLogOffers()
     {
         var offers = new List<LogShopOffer>();
-        for (int i = 0; i < view.WeaponRowCount && i < shop.weapons.Length; i++)
+        // 진열된(해금된) 무기만 기록한다. 줄 번호는 화면과 같은 visibleWeapons 순서다.
+        for (int i = 0; i < view.WeaponRowCount && i < visibleWeapons.Count; i++)
         {
-            var offer = shop.weapons[i];
-            var entry = offer != null ? WeaponInfo.Find(weapons, offer.weaponId) : null;
+            var entry = WeaponInfo.Find(weapons, visibleWeapons[i].weaponId);
             if (entry != null)
             {
-                AddLogOffer(offers, "Weapon", entry.id, "weapon_catalog", i,
-                    ShopInfo.IsWeaponUnlocked(shop, entry, gameManager.ShopWave), entry.id == selectedWeaponId);
+                AddLogOffer(offers, "Weapon", entry.id, "weapon_catalog", i, true, entry.id == selectedWeaponId);
             }
         }
         var selected = WeaponInfo.Find(weapons, selectedWeaponId);

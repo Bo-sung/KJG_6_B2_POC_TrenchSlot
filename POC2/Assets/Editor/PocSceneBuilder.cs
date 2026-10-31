@@ -265,7 +265,7 @@ public static class PocSceneBuilder
         var spawnRight = PocAssetBuilder.NewEmpty("SpawnRight", environment.transform, new Vector3(26f, 0f, 4f));
 
         var player = new GameObject("Player");
-        player.transform.position = new Vector3(0f, 0f, -6f);
+        player.transform.position = new Vector3(0f, 0.1f, -6f);
         var controller = player.AddComponent<CharacterController>();
         controller.center = new Vector3(0f, 0.9f, 0f);
         controller.height = 1.8f;

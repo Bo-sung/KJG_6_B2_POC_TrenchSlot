@@ -23,6 +23,8 @@ public static class PocShopUiVerification
 {
     private const string RUNNING = "PocShopUiVerification.running";
     private const string TAG = "[PocShopUiVerification]";
+    // 이번 실행에서 LogKitStore로 넘어간 게임 기록 줄.
+    private static readonly List<string> telemetryLines = new List<string>();
     // 기준 해상도에서 이보다 작은 글자는 1280×720에서 10px 밑으로 내려가 읽기 어렵다.
     private const float MIN_FONT_SIZE = 16f;
     private static readonly Vector2Int[] RESOLUTIONS = { new Vector2Int(1920, 1080), new Vector2Int(1280, 720), new Vector2Int(1024, 768) };
@@ -39,6 +41,7 @@ public static class PocShopUiVerification
     static PocShopUiVerification()
     {
         EditorApplication.update += Tick;
+        LogKitStore.LineAppended += _line => telemetryLines.Add(_line);
     }
 
     public static string ShotDirectory => Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/PocShopUi"));
@@ -69,6 +72,7 @@ public static class PocShopUiVerification
     [MenuItem("POC/Verify Shop UI (Play)")]
     public static void RunChecks()
     {
+        telemetryLines.Clear();
         EditorSceneManager.OpenScene("Assets/Scenes/Game.unity", OpenSceneMode.Single);
         SessionState.SetBool(RUNNING, true);
         EditorApplication.EnterPlaymode();
@@ -264,6 +268,8 @@ public static class PocShopUiVerification
         // 바닥 무기: 2번 M1873(파츠 장착)을 Winchester로 교체하면 그 무기는 파츠를 단 채 바닥에 남는다.
         var dropped = loadout.Get(1);
         yield return Click(Rows("weaponRows")[WeaponIndex("win1886")], "Winchester 1886 선택");
+        var weaponImage = (Image)Get(view, "weaponImage");
+        Check(weaponImage.gameObject.activeSelf && weaponImage.sprite != null, "선택한 무기의 총기 이미지가 상세에 보인다");
         yield return Click(Rows("weaponBuyButtons")[1], "2번 슬롯 교체 구매");
         Check(loadout.Get(1)?.WeaponId == "win1886" && !loadout.Contains(dropped) && dropped.HasPart(heavy.id), "교체된 M1873은 파츠를 단 채 바닥");
         Check(Text("inventoryText").Contains("바닥 무기") && Text("inventoryText").Contains(heavy.name), "유저 정보에 바닥 무기와 그 파츠 표시");
@@ -275,7 +281,8 @@ public static class PocShopUiVerification
 
         // 스크롤: 목록 마지막 무기를 키보드/게임패드로 고르면 보이는 곳까지 내려간다.
         var weaponRows = Rows("weaponRows");
-        var last = weaponRows[weaponRows.Length - 1];
+        Check(weaponRows.Count(_r => _r.gameObject.activeSelf) == VisibleWeapons().Length, "해금된 무기 줄만 보인다");
+        var last = weaponRows.Last(_r => _r.gameObject.activeSelf);
         EventSystem.current.SetSelectedGameObject(last.gameObject);
         yield return Frames(3);
         var viewport = ((ScrollRect[])Get(view, "scrolls"))[0].viewport;
@@ -305,19 +312,12 @@ public static class PocShopUiVerification
             return;
         }
         session.Flush();
-        string file = Path.Combine(Application.persistentDataPath, "Telemetry", session.SessionId + ".jsonl");
-        var rows = new List<JObject>();
-        using (var reader = new StreamReader(new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
-        {
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    rows.Add(JObject.Parse(line));
-                }
-            }
-        }
+        // 기록은 LogKitStore를 거쳐 나온 줄을 그대로 모은다(로컬 파일은 LogKit이 전송 후 정리한다).
+        var rows = telemetryLines
+            .Where(_line => !string.IsNullOrWhiteSpace(_line))
+            .Select(JObject.Parse)
+            .Where(_row => (string)_row["sessionId"] == session.SessionId)
+            .ToList();
         JObject[] Of(string _type) => rows.Where(_row => (string)_row["eventType"] == _type).ToArray();
         var opened = Of("shop_opened");
         var closed = Of("shop_closed");
@@ -502,7 +502,15 @@ public static class PocShopUiVerification
         Debug.Log($"{TAG} 메시지: {Text("messageText")}");
     }
 
-    private static int WeaponIndex(string _weaponId) => Array.FindIndex(TableManager.Instance.Shop.weapons, _o => _o.weaponId == _weaponId);
+    // 무기 목록은 지금 해금된 무기만 판매 순서대로 채운다. 줄 번호는 이 목록 안의 순서다.
+    private static ShopData.WeaponOffer[] VisibleWeapons()
+    {
+        var shop = TableManager.Instance.Shop;
+        var weapons = TableManager.Instance.Weapon;
+        return shop.weapons.Where(_o => ShopInfo.IsWeaponUnlocked(shop, WeaponInfo.Find(weapons, _o.weaponId), game.ShopWave)).ToArray();
+    }
+
+    private static int WeaponIndex(string _weaponId) => Array.FindIndex(VisibleWeapons(), _o => _o.weaponId == _weaponId);
 
     private static ShopRowView[] Rows(string _field) => (ShopRowView[])Get(view, _field);
 

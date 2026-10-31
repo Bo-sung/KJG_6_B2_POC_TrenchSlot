@@ -16,6 +16,8 @@ public sealed partial class ShopPresenter : MonoBehaviour
     private string selectedWeaponId = "";
     private string selectedPartId = "";
     private readonly List<PartData.Entry> visibleParts = new List<PartData.Entry>();
+    // 지금 무기 목록에 진열된(해금된) 판매 항목. 줄 번호는 이 목록의 순서다.
+    private readonly List<ShopData.WeaponOffer> visibleWeapons = new List<ShopData.WeaponOffer>();
 
     private void Start()
     {
@@ -167,9 +169,9 @@ public sealed partial class ShopPresenter : MonoBehaviour
     private void OnWeaponSelected(int _index)
     {
         using var input = LogInput("weapon_select", "weapon_catalog", _index);
-        if (_index >= 0 && _index < shop.weapons.Length && shop.weapons[_index] != null)
+        if (_index >= 0 && _index < visibleWeapons.Count && visibleWeapons[_index] != null)
         {
-            SelectWeapon(shop.weapons[_index].weaponId, "weapon_catalog");
+            SelectWeapon(visibleWeapons[_index].weaponId, "weapon_catalog");
         }
         else
         {
@@ -391,26 +393,34 @@ public sealed partial class ShopPresenter : MonoBehaviour
 
     private void RefreshWeapons(bool _open, int _wave)
     {
+        // 해금 전 무기는 진열하지 않는다. 보이는 무기만 판매 순서대로 줄을 앞에서부터 채운다.
+        visibleWeapons.Clear();
+        foreach (var offer in shop.weapons)
+        {
+            var entry = offer != null ? WeaponInfo.Find(weapons, offer.weaponId) : null;
+            if (entry != null && ShopInfo.IsWeaponUnlocked(shop, entry, _wave))
+            {
+                visibleWeapons.Add(offer);
+            }
+        }
         for (int i = 0; i < view.WeaponRowCount; i++)
         {
-            var offer = i < shop.weapons.Length ? shop.weapons[i] : null;
-            var entry = offer != null ? WeaponInfo.Find(weapons, offer.weaponId) : null;
-            if (entry == null)
+            if (i >= visibleWeapons.Count)
             {
                 view.SetWeaponRow(i, "", "", false, false);
                 continue;
             }
-            bool unlocked = ShopInfo.IsWeaponUnlocked(shop, entry, _wave);
-            var era = ShopInfo.FindEra(shop, entry.era);
+            var offer = visibleWeapons[i];
+            var entry = WeaponInfo.Find(weapons, offer.weaponId);
             int held = HeldCount(entry.id);
-            string sub = unlocked ? $"{EraName(entry.era)} · {AmmoName(entry.ammoId)}{(held > 0 ? $" · 휴대 {held}자루" : "")}" : $"잠김 · WAVE {(era != null ? era.startWave : 0)}부터";
-            // 잠긴 무기도 눌러서 상세를 볼 수 있다. 구매 버튼에서 막는다.
+            string sub = $"{EraName(entry.era)} · {AmmoName(entry.ammoId)}{(held > 0 ? $" · 휴대 {held}자루" : "")}";
             view.SetWeaponRow(i, $"{entry.name}\n<size=90%><color=#AEBCCD>{sub}</color></size>", $"${offer.price:N0}", true, offer.weaponId == selectedWeaponId);
         }
 
         var selected = WeaponInfo.Find(weapons, selectedWeaponId);
         bool buyable = selected != null && ShopInfo.IsWeaponUnlocked(shop, selected, _wave);
         view.SetWeaponDetail(selected != null ? WeaponDetail(selected, buyable) : "무기를 선택하세요.");
+        view.SetWeaponImage(selected != null ? WeaponIconInfo.Find(selected.modelId) : null);
         int price = ShopInfo.WeaponPrice(shop, selectedWeaponId);
         bool affordable = gameManager.Wallet.CanAfford(price);
         int empty = gameManager.Loadout.FirstEmptySlot();

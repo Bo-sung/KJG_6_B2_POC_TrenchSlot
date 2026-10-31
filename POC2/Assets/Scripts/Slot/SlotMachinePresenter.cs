@@ -65,7 +65,7 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
         {
             return $"소지금 부족 (필요 ${CurrentCost})";
         }
-        return $"E / Y: 슬롯 회전 (-${CurrentCost} · 체력 +{SlotMachineInfo.SpinHealAmount(Table):0.#})";
+        return $"F / Y: 슬롯 회전 (-${CurrentCost} · 체력 +{SlotMachineInfo.SpinHealAmount(Table):0.#})";
     }
 
     public void Interact()

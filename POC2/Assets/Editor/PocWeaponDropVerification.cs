@@ -166,7 +166,7 @@ public static class PocWeaponDropVerification
             Check(paths.Contains("<Keyboard>/f"), "Pickup 키보드 F 바인딩");
             Check(paths.Contains("<Gamepad>/buttonWest"), "Pickup 게임패드 X(buttonWest) 바인딩");
         }
-        AssertBinding(asset, "Player/Interact", "852140f2-7766-474d-8707-702459ba45f3", "<Keyboard>/e", "<Gamepad>/buttonNorth");
+        AssertBinding(asset, "Player/Interact", "852140f2-7766-474d-8707-702459ba45f3", "<Keyboard>/f", "<Gamepad>/buttonNorth");
         AssertBinding(asset, "Player/Crouch", "27c5f898-bc57-4ee1-8800-db469aca5fe3", "<Keyboard>/c", "<Gamepad>/buttonEast");
         var crouchPaths = asset.FindAction("Player/Crouch").bindings.Select(_b => _b.effectivePath).ToList();
         Check(crouchPaths.Contains("<Keyboard>/leftCtrl"), "Crouch 키보드 LeftCtrl 바인딩 추가(C 유지)");

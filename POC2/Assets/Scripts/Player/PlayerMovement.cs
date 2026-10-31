@@ -15,6 +15,11 @@ public sealed class PlayerMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float gamepadLookSpeed = 180f;
     [SerializeField, Range(0f, 90f)] private float pitchLimit;
 
+    // 씬 로드·GC 히치로 한 프레임이 길어질 때 큰 이동이 한 번에 나가 바닥을 뚫는 것을 막는다.
+    private const float MAX_MOVE_DELTA_TIME = 0.05f;
+    // 맵 아래로 떨어졌을 때 스폰 위치로 되돌리는 깊이.
+    private const float FALL_RESET_DEPTH = 3f;
+
     private CharacterController controller;
     private float verticalSpeed;
     private float pitch;
@@ -26,6 +31,7 @@ public sealed class PlayerMovement : MonoBehaviour
     private float recoilYaw;
     private float recoilRecovery;
     private GameConfigData feedbackConfig;
+    private Vector3 spawnPosition;
 
     public bool IsCrouched { get; private set; }
     public bool IsControlEnabled => isActiveAndEnabled && controller != null && controller.enabled &&
@@ -39,6 +45,7 @@ public sealed class PlayerMovement : MonoBehaviour
         controller = GetComponent<CharacterController>();
         standingHeight = controller.height;
         standingCenter = controller.center;
+        spawnPosition = transform.position;
         if (viewPivot != null)
         {
             standingViewPosition = viewPivot.localPosition;

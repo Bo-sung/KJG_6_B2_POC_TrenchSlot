@@ -212,11 +212,11 @@ public static class PocPlayerFeedbackVerification
         Check(group.alpha == 0f, "indicator fully fades");
         Check(Get(view, "damageFlash") != null && Get(view, "hitMarkerGroup") != null, "existing flash and hit marker references preserved");
         typeof(HudPresenter).GetMethod("OnPickupPromptChanged", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(presenter, new object[] { "[F / X] Rifle pickup" });
-        typeof(HudPresenter).GetMethod("OnInteractionPromptChanged", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(presenter, new object[] { "[E] Spin slot" });
+        typeof(HudPresenter).GetMethod("OnInteractionPromptChanged", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(presenter, new object[] { "[F] Spin slot" });
         TMPro.TMP_Text prompt = (TMPro.TMP_Text)Get(view, "promptText");
         Check(prompt.text.Contains("[F / X]"), "pickup prompt wins regardless of same-frame slot event ordering");
         typeof(HudPresenter).GetMethod("OnPickupPromptChanged", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(presenter, new object[] { "" });
-        Check(prompt.text.Contains("[E]"), "clearing pickup restores current slot prompt");
+        Check(prompt.text.Contains("[F]"), "clearing pickup restores current slot prompt");
         typeof(HudPresenter).GetMethod("OnInteractionPromptChanged", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(presenter, new object[] { "" });
         Check(!prompt.enabled, "clearing both interaction channels hides prompt");
 

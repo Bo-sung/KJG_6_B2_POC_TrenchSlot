@@ -27,6 +27,7 @@ public static class PocShopAuthoring
     private const float RIGHT_WIDTH = WIDTH - MARGIN - RIGHT_X;
     private const float PAD = 12f;
     private const float SCROLLBAR_WIDTH = 12f;
+    private const float WEAPON_IMAGE_SIZE = 200f;
 
     private static readonly Color BACKGROUND_COLOR = new Color(0.063f, 0.09f, 0.133f, 0.98f);
     private static readonly Color SECTION_COLOR = new Color(0.11f, 0.161f, 0.22f, 1f);
@@ -106,9 +107,16 @@ public static class PocShopAuthoring
         }
 
         var detailBox = Box(weaponSection, "WeaponDetail", PAD * 2f + half, -52f, half, 360f);
-        var detail = Text(detailBox, "Detail", "", 20, PAD, -10f, half - PAD * 2f, 218f, Color.white, false);
+        // 상세 글은 왼쪽에 두고, 오른쪽 위에 선택 무기 이미지를 둔다(이미지가 없는 무기는 칸을 숨긴다).
+        var detail = Text(detailBox, "Detail", "", 20, PAD, -10f, half - PAD * 3f - WEAPON_IMAGE_SIZE, 218f, Color.white, false);
         detail.textWrappingMode = TextWrappingModes.Normal;
         detail.overflowMode = TextOverflowModes.Ellipsis;
+        var weaponImageObject = PocAssetBuilder.UiObject("Image", detailBox);
+        var weaponImage = weaponImageObject.AddComponent<Image>();
+        weaponImage.preserveAspect = true;
+        weaponImage.raycastTarget = false;
+        PocAssetBuilder.Place(weaponImage.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(half - PAD - WEAPON_IMAGE_SIZE, -PAD), new Vector2(WEAPON_IMAGE_SIZE, WEAPON_IMAGE_SIZE));
+        weaponImageObject.SetActive(false);
         var buyButtons = new ShopRowView[slotCount];
         for (int i = 0; i < slotCount; i++)
         {
@@ -204,6 +212,7 @@ public static class PocShopAuthoring
         so.FindProperty("inventoryText").objectReferenceValue = inventory;
         so.FindProperty("akimboNoteText").objectReferenceValue = akimboNote;
         so.FindProperty("weaponDetailText").objectReferenceValue = detail;
+        so.FindProperty("weaponImage").objectReferenceValue = weaponImage;
         so.FindProperty("partDetailText").objectReferenceValue = partDetail;
         so.FindProperty("nextWaveButton").objectReferenceValue = nextWave;
         so.FindProperty("partBuyButton").objectReferenceValue = partBuy;

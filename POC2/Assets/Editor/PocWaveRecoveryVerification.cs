@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEditor;
@@ -190,7 +191,7 @@ public static class PocWaveRecoveryVerification
             "shop transition preserves input gate and combat/projectile cleanup");
         Check(WeaponBuyButton("win1886").interactable && WeaponBuyButton("colt1878").interactable,
             "both 1887 shop weapons become affordable on actual first-shop UI");
-        Check(!WeaponBuyButton("mp18").interactable, "WW1 weapon stays locked in the first shop");
+        Check(!WeaponRowShown("mp18"), "WW1 weapon is not listed in the first shop");
         for (int i = 0; i < game.SlotOffers.Count; i++)
         {
             Check(game.SlotOffers.IsSoldOut(i) || UpgradeButton(i).interactable, $"slot upgrade offer {i} affordable after auto recovery");
@@ -328,12 +329,23 @@ public static class PocWaveRecoveryVerification
     private static Button WeaponBuyButton(string _weaponId)
     {
         var presenter = UnityEngine.Object.FindFirstObjectByType<ShopPresenter>();
-        int index = Array.FindIndex(TableManager.Instance.Shop.weapons, _o => _o.weaponId == _weaponId);
-        Call(presenter, "OnWeaponSelected", index);
         var game = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+        var shop = TableManager.Instance.Shop;
+        var weapons = TableManager.Instance.Weapon;
+        // 무기 목록 줄은 해금된 무기만 판매 순서대로 채운다.
+        var visible = shop.weapons.Where(_o => ShopInfo.IsWeaponUnlocked(shop, WeaponInfo.Find(weapons, _o.weaponId), game.ShopWave)).ToArray();
+        Call(presenter, "OnWeaponSelected", Array.FindIndex(visible, _o => _o.weaponId == _weaponId));
         int slot = Math.Max(0, game.Loadout.FirstEmptySlot());
         var buttons = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "weaponBuyButtons");
         return buttons[slot].Button;
+    }
+
+    // 해금 전 무기는 목록 줄이 꺼져 있어야 한다. 켜진 줄의 이름으로 찾는다.
+    private static bool WeaponRowShown(string _weaponId)
+    {
+        string name = WeaponInfo.Find(TableManager.Instance.Weapon, _weaponId).name;
+        var rows = (ShopRowView[])Get(UnityEngine.Object.FindFirstObjectByType<ShopView>(), "weaponRows");
+        return rows.Any(_r => _r.gameObject.activeSelf && _r.LogLabel != null && _r.LogLabel.Contains(name));
     }
 
     private static Button UpgradeButton(int _index)
