@@ -13,6 +13,8 @@ public sealed class PlayerInteractor : MonoBehaviour
     [SerializeField] private LayerMask interactLayers;
 
     private static readonly RaycastHit[] OCCLUSION_BUFFER = new RaycastHit[16];
+    // IInteractable 문구에 넣는 키 자리 표시. 실제 키 이름(키보드 F, 패드 Y 등)으로 바뀐다.
+    public const string KEY_TOKEN = "{KEY}";
 
     private float maxDistance;
     private string lastPrompt = "";
@@ -86,7 +88,7 @@ public sealed class PlayerInteractor : MonoBehaviour
         bool aimFound = TryAim(out RaycastHit aimHit);
         IInteractable target = aimFound ? aimHit.collider.GetComponentInParent<IInteractable>() : null;
         bool usable = target != null && target.CanInteract();
-        Notify(usable ? target.GetPrompt() : "");
+        Notify(usable ? target.GetPrompt().Replace(KEY_TOKEN, InteractKeyLabel()) : "");
 
         if (usable && interactAction != null && interactAction.action != null && interactAction.action.WasPressedThisFrame())
         {
@@ -195,6 +197,15 @@ public sealed class PlayerInteractor : MonoBehaviour
         }
         Ray ray = new Ray(viewCamera.transform.position, viewCamera.transform.forward);
         return Physics.Raycast(ray, out _hit, maxDistance, interactLayers, QueryTriggerInteraction.Ignore);
+    }
+
+    // 마지막으로 쓴 장치 기준의 상호작용 키 이름. 키보드면 F, 게임패드면 Y처럼 나온다.
+    private string InteractKeyLabel()
+    {
+        string label = interactAction != null && interactAction.action != null
+            ? interactAction.action.GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions)
+            : "";
+        return string.IsNullOrEmpty(label) ? "F" : label;
     }
 
     private void Notify(string _prompt)

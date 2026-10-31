@@ -55,17 +55,17 @@ public sealed class SlotMachinePresenter : MonoBehaviour, IInteractable
     {
         if (spinning)
         {
-            return "회전 중...";
+            return "회전 중";
         }
         if (gameManager == null || !gameManager.IsWaveActive)
         {
-            return "정비 시간에는 슬롯이 잠깁니다";
+            return "정비 중 잠김";
         }
         if (gameManager.Wallet != null && !gameManager.Wallet.CanAfford(CurrentCost))
         {
-            return $"소지금 부족 (필요 ${CurrentCost})";
+            return $"소지금 부족 ${CurrentCost}";
         }
-        return $"F / Y: 슬롯 회전 (-${CurrentCost} · 체력 +{SlotMachineInfo.SpinHealAmount(Table):0.#})";
+        return $"[{PlayerInteractor.KEY_TOKEN}] 회전 -${CurrentCost} · HP +{SlotMachineInfo.SpinHealAmount(Table):0.#}";
     }
 
     public void Interact()
