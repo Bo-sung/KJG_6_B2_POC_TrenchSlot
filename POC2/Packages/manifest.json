@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.team.logkit": "https://github.com/Bo-sung/logkit.git?path=package#2548fa7f504436fb3a99f1f193145c3ee2d63943",
+    "com.team.logkit": "file:../../../../logkit/package",
     "com.unity.ai.assistant": "2.21.0-pre.2",
     "com.unity.ai.inference": "2.6.1",
     "com.unity.ai.navigation": "2.0.14",

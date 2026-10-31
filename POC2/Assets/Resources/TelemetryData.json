@@ -5,7 +5,7 @@
   "uploadEnabled": false,
   "developmentServerUrl": "",
   "releaseServerUrl": "",
-  "apiKey": "8dNZYPDwt-Fm5isgh9dAjyOReYcU5gpC",
+  "apiKey": "",
   "uploadIntervalSeconds": 5,
   "requestTimeoutSeconds": 5,
   "retryPendingOnStartup": true

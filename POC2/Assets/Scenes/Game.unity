@@ -1772,6 +1772,60 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1376735422}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &384536692
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 384536694}
+  - component: {fileID: 384536693}
+  m_Layer: 0
+  m_Name: LogKit
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &384536693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 384536692}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f257d5be314048769a230202fa9c723d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: LogKit.Runtime::LogKit.GameLogger
+  _developmentServerUrl: http://172.21.10.67:5000/api/logs
+  _releaseServerUrl: http://172.21.10.67:5000/api/logs
+  _apiKey: 8dNZYPDwt-Fm5isgh9dAjyOReYcU5gpC
+  _captureUnityLogs: 1
+  _flushIntervalSeconds: 5
+  _uploadIntervalSeconds: 5
+  _uploadOnQuit: 1
+  _flushOnPause: 1
+  _retryPendingOnStartup: 1
+  _requestTimeoutSeconds: 5
+--- !u!4 &384536694
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 384536692}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &505030116
 GameObject:
   m_ObjectHideFlags: 0
@@ -5228,3 +5282,4 @@ SceneRoots:
   - {fileID: 1668040971}
   - {fileID: 1376735422}
   - {fileID: 169369190}
+  - {fileID: 384536694}

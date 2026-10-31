@@ -18,7 +18,7 @@ public sealed class TelemetryProfile
     public bool uploadEnabled = true;
     public string developmentServerUrl = "http://localhost:5000/api/logs";
     public string releaseServerUrl = "http://localhost:5000/api/logs";
-    public string apiKey = "dev-log-key";
+    public string apiKey = "";
     public float uploadIntervalSeconds = 5f;
     public bool retryPendingOnStartup = true;
     public int requestTimeoutSeconds = 5;
