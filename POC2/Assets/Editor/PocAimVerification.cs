@@ -77,7 +77,7 @@ public static class PocAimVerification
         var inventory = new PartInventory(TableManager.Instance.Part);
         try
         {
-            foreach (var pair in new[] { ("colt_saa", "m1873"), ("colt_1878_shotgun", "colt1878"), ("winchester_1886", "win1886"), ("revolver", "p08"), ("bolt", "smle"), ("smg", "mp18"), ("shotgun", "m1897") })
+            foreach (var pair in new[] { ("colt_saa", "m1873"), ("colt_1878_shotgun", "colt1878"), ("winchester_1886", "win1886"), ("luger_p08", "p08"), ("smle_mk3", "smle"), ("mp18", "mp18"), ("winchester_1897", "m1897") })
             {
                 var weapon = new WeaponInstance(pair.Item2, 0);
                 var profile = WeaponAimInfo.Find(TableManager.Instance.WeaponAim, pair.Item1);

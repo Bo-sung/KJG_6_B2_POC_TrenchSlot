@@ -12,5 +12,9 @@
     {"modelId":"smg", "rear":{"x":0,"y":0.09,"z":-0.16}, "front":{"x":0,"y":0.09,"z":0.35}, "eyeDistance":0.25},
     {"modelId":"shotgun", "rear":{"x":0,"y":0.085,"z":-0.12}, "front":{"x":0,"y":0.085,"z":0.55}, "eyeDistance":0.25}
     ,{"modelId":"colt_1878_shotgun", "rear":{"x":0,"y":0.085,"z":-0.14}, "front":{"x":0,"y":0.085,"z":0.56}, "eyeDistance":0.25}
+    ,{"modelId":"luger_p08", "rear":{"x":0,"y":0.01,"z":-0.0577}, "front":{"x":0,"y":0.01,"z":0.1445}, "eyeDistance":0.25}
+    ,{"modelId":"smle_mk3", "rear":{"x":0,"y":0.01,"z":0.0801}, "front":{"x":0,"y":0.01,"z":0.5751}, "eyeDistance":0.38}
+    ,{"modelId":"mp18", "rear":{"x":0,"y":0.01,"z":0.049}, "front":{"x":0,"y":0.01,"z":0.4075}, "eyeDistance":0.30}
+    ,{"modelId":"winchester_1897", "rear":{"x":0,"y":0.01,"z":0}, "front":{"x":0,"y":0.01,"z":0.585}, "eyeDistance":0.28}
   ]
 }

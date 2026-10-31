@@ -61,3 +61,11 @@ MonoBehaviour:
     prefab: {fileID: 5347209952793652866, guid: 14b517231f5b2934fbda0e8457ea1e11, type: 3}
   - id: colt_1878_shotgun
     prefab: {fileID: 2973067415692731127, guid: d640084665e99cd45a21bbc33ac868dc, type: 3}
+  - id: luger_p08
+    prefab: {fileID: 6940759030916755953, guid: 5874d5c8483d4e9897b6a4a583259fe1, type: 3}
+  - id: smle_mk3
+    prefab: {fileID: 3738576962186114809, guid: f528aaabf1124aa38745215fcfb35a65, type: 3}
+  - id: mp18
+    prefab: {fileID: 4544637936842411591, guid: 24ec770977114665bc20160e81822ab9, type: 3}
+  - id: winchester_1897
+    prefab: {fileID: 1003917160368566517, guid: 2182e9d228004ff1873ca664eb3c66ef, type: 3}

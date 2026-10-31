@@ -205,7 +205,7 @@ public static class PocWeaponDropVerification
             everyModel &= heldComponent != null && heldComponent.Has(id);
         }
         Check(everyModel, "들고 있는 무기 프리팹은 외형마다 모델을 가진다");
-        Check(heldComponent != null && heldComponent.HasOffHand("revolver"), "아킴보 권총 외형은 왼손 모델도 가진다");
+        Check(heldComponent != null && heldComponent.HasOffHand("luger_p08"), "아킴보 권총 외형은 왼손 모델도 가진다");
         Check(heldComponent != null && heldComponent.HasOffHand("colt_saa") && !heldComponent.HasOffHand("colt_1878_shotgun"),
             "M1873은 왼손 모델이 있고 Colt 1878 산탄총은 없다");
         var weapons = TableManager.Instance.Weapon;

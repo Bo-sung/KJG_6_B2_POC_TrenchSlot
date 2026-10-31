@@ -26,7 +26,7 @@ public static class PocWeaponDropAuthoring
     private const string OLD_REVOLVER_NAME = "Revolver";
 
     // 외형 id(WeaponData.modelId). 같은 계열 총기는 외형을 공유한다.
-    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun", "colt_saa", "colt_1878", "winchester_1886", "colt_1878_shotgun" };
+    public static readonly string[] MODEL_IDS = { "revolver", "bolt", "smg", "shotgun", "colt_saa", "colt_1878", "winchester_1886", "colt_1878_shotgun", "luger_p08", "smle_mk3", "mp18", "winchester_1897" };
     private static readonly string[] WEAPON_IDS = MODEL_IDS;
 
     private static Material metal;
@@ -140,12 +140,11 @@ public static class PocWeaponDropAuthoring
         // 바닥 높이 0 기준. 모델은 살짝 띄워 바닥에 얹힌 것처럼 보이게 한다.
         var model = new GameObject("Model").transform;
         model.SetParent(root.transform, false);
-        model.localPosition = new Vector3(0f, 0.1f, 0f);
+        model.localPosition = new Vector3(0f, PickupModelHeight(_id), 0f);
         BuildModel(_id, model);
 
         var box = root.AddComponent<BoxCollider>();
-        box.center = new Vector3(0f, 0.12f, 0f);
-        if (_id == "colt_1878_shotgun") box.center = new Vector3(0f, 0.12f, 0.6f);
+        box.center = BoundsCenter(_id);
         box.size = BoundsSize(_id);
         string path = string.Format(PICKUP_PREFAB_FORMAT, _id);
         PrefabUtility.SaveAsPrefabAsset(root, path);
@@ -272,6 +271,19 @@ public static class PocWeaponDropAuthoring
             case "colt_1878_shotgun":
                 BuildImportedModel("colt_1878_shotgun_reference_sightfix", _parent, 0.21f);
                 break;
+            // WW1 game FBX는 LOD0만 쓴다. MP18은 game FBX 소켓이 어긋나 기준 FBX를 프로젝트 내보내기 축으로 다시 내보낸 사본을 쓴다.
+            case "luger_p08":
+                BuildImportedModel("luger_p08_v8_game", _parent, 0.131f, -0.07f, true);
+                break;
+            case "smle_mk3":
+                BuildImportedModel("smle_mk3_v7_reference_game", _parent, 0.115f, -0.52f, true);
+                break;
+            case "mp18":
+                BuildImportedModel("mp18_v5_reference_unity", _parent, 0.2045f, -0.39f, true);
+                break;
+            case "winchester_1897":
+                BuildImportedModel("winchester_1897_v7_game", _parent, 0.011f, -0.4f, true);
+                break;
             default:
                 Debug.LogError($"PocWeaponDropAuthoring: 알 수 없는 무기 {_id}");
                 break;
@@ -351,7 +363,8 @@ public static class PocWeaponDropAuthoring
 
     // AssetFactory FBX는 총구가 -X 방향이므로 게임의 +Z 방향으로 회전한다.
     // 세로 중심을 기존 외형과 맞추고, FBX 자체는 수정하지 않은 채 중첩 프리팹으로 사용한다.
-    private static void BuildImportedModel(string _name, Transform _parent, float _verticalCenter)
+    // _forward는 총구가 기존 임시 외형과 비슷한 앞쪽에 오도록 FBX 원점(개머리판 끝)을 뒤로 민다.
+    private static void BuildImportedModel(string _name, Transform _parent, float _verticalCenter, float _forward = 0f, bool _lod0Only = false)
     {
         string path = $"Assets/Models/AssetFactory/{_name}.fbx";
         var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -361,8 +374,49 @@ public static class PocWeaponDropAuthoring
         }
         var instance = (GameObject)PrefabUtility.InstantiatePrefab(asset);
         instance.transform.SetParent(_parent, false);
-        instance.transform.localPosition = new Vector3(0f, -_verticalCenter, 0f);
+        instance.transform.localPosition = new Vector3(0f, -_verticalCenter, _forward);
         instance.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+        if (_lod0Only && _parent.GetComponent<WeaponModelLod0>() == null)
+        {
+            _parent.gameObject.AddComponent<WeaponModelLod0>();
+        }
+    }
+
+    // 바닥 픽업 모델 높이. WW1 모델은 가장 낮은 점이 바닥 위 1cm에 오게 한다.
+    private static float PickupModelHeight(string _id)
+    {
+        switch (_id)
+        {
+            case "luger_p08":
+                return 0.1408f;
+            case "smle_mk3":
+                return 0.189f;
+            case "mp18":
+                return 0.2145f;
+            case "winchester_1897":
+                return 0.196f;
+            default:
+                return 0.1f;
+        }
+    }
+
+    private static Vector3 BoundsCenter(string _id)
+    {
+        switch (_id)
+        {
+            case "colt_1878_shotgun":
+                return new Vector3(0f, 0.12f, 0.6f);
+            case "luger_p08":
+                return new Vector3(0f, 0.0817f, 0.041f);
+            case "smle_mk3":
+                return new Vector3(0.009f, 0.1063f, 0.04f);
+            case "mp18":
+                return new Vector3(-0.0334f, 0.1184f, 0.015f);
+            case "winchester_1897":
+                return new Vector3(0f, 0.109f, 0.1f);
+            default:
+                return new Vector3(0f, 0.12f, 0f);
+        }
     }
 
     private static void Part(PrimitiveType _type, string _name, Transform _parent, Vector3 _position, Vector3 _scale, Material _material, Vector3 _euler = default)
@@ -394,6 +448,14 @@ public static class PocWeaponDropAuthoring
                 return new Vector3(0.14f, 0.2f, 0.95f);
             case "colt_1878_shotgun":
                 return new Vector3(0.14f, 0.23f, 1.25f);
+            case "luger_p08":
+                return new Vector3(0.14f, 0.1633f, 0.2426f);
+            case "smle_mk3":
+                return new Vector3(0.14f, 0.2125f, 1.1405f);
+            case "mp18":
+                return new Vector3(0.1503f, 0.2368f, 0.83f);
+            case "winchester_1897":
+                return new Vector3(0.14f, 0.218f, 1.02f);
             default:
                 return new Vector3(0.14f, 0.2f, 0.56f);
         }
