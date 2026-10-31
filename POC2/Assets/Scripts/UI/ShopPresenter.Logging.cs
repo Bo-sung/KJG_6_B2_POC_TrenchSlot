@@ -1,7 +1,35 @@
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 public sealed partial class ShopPresenter
 {
+    // 입력 한 번의 기록 범위. Dispose에서 아무 게임 이벤트도 없었으면 사유를 남긴다.
+    private readonly struct LogInputScope : IDisposable
+    {
+        private readonly ShopPresenter owner;
+        private readonly string id;
+
+        public LogInputScope(ShopPresenter _owner, string _id)
+        {
+            owner = _owner;
+            id = _id;
+        }
+
+        public void Dispose()
+        {
+            if (owner == null)
+            {
+                return;
+            }
+            string reason = owner.logIgnoredReason;
+            owner.logIgnoredReason = null;
+            owner.gameManager.EndShopInput(id, reason);
+        }
+    }
+
+    private string logIgnoredReason;
+
     private void LateUpdate()
     {
         ObserveOffers();
@@ -11,8 +39,73 @@ public sealed partial class ShopPresenter
     {
         if (gameManager != null)
         {
-            gameManager.ObserveShopExposure(false, null, null, null);
+            gameManager.ObserveShopExposure(false, null, null, null, "presenter_disabled");
         }
+    }
+
+    private LogInputScope LogInput(string _action, string _placement, int _row, int? _slot = null)
+    {
+        if (gameManager == null || gameManager.ShopLog == null || !gameManager.ShopLog.IsRecording)
+        {
+            return default;
+        }
+        logIgnoredReason = null;
+        string id = gameManager.BeginShopInput(_action, () => LogControl(_placement, _row), _slot, selectedWeaponId, selectedPartId);
+        return new LogInputScope(this, id);
+    }
+
+    private void LogIgnored(string _reason)
+    {
+        logIgnoredReason = _reason;
+    }
+
+    private void OnFocusChanged(GameObject _from, GameObject _to, bool _programmatic)
+    {
+        if (gameManager == null || gameManager.ShopLog == null || !gameManager.ShopLog.IsRecording)
+        {
+            return;
+        }
+        gameManager.ObserveShopFocus(() => LogControl(_from), () => LogControl(_to), _programmatic);
+    }
+
+    private void OnPointerEntered(GameObject _target)
+    {
+        if (gameManager == null || gameManager.ShopLog == null || !gameManager.ShopLog.IsRecording)
+        {
+            return;
+        }
+        gameManager.ObserveShopPointerEnter(() => LogControl(_target));
+    }
+
+    private void OnPointerExited(GameObject _target)
+    {
+        if (gameManager == null || gameManager.ShopLog == null || !gameManager.ShopLog.IsRecording)
+        {
+            return;
+        }
+        gameManager.ObserveShopPointerExit(() => LogControl(_target));
+    }
+
+    private void OnScrollChanged(string _view, float? _previous, float _new, bool _programmatic)
+    {
+        if (gameManager == null || gameManager.ShopLog == null || !gameManager.ShopLog.IsRecording)
+        {
+            return;
+        }
+        gameManager.ObserveShopScroll(_view, _previous, _new, _programmatic);
+    }
+
+    private LogShopControl LogControl(GameObject _target)
+    {
+        string placement = view.LogPlacementOf(_target, out int row);
+        return placement == null ? null : LogControl(placement, row);
+    }
+
+    private LogShopControl LogControl(string _placement, int _row)
+    {
+        LogShopRowState shown = view.CaptureLogRow(_placement, _row);
+        return new LogShopControl { placement = _placement, row = _row >= 0 ? _row : (int?)null, label = shown?.label,
+            priceText = shown?.priceText, interactable = shown?.interactable };
     }
 
     private void ObserveOffers()

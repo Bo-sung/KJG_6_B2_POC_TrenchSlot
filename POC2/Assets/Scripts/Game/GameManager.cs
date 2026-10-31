@@ -220,17 +220,24 @@ public sealed partial class GameManager : MonoBehaviour
             IntermissionChanged?.Invoke(intermissionLeft);
             if (intermissionLeft <= 0f)
             {
-                StartNextWave();
+                StartNextWave("timeout");
             }
         }
     }
 
     public void StartNextWave()
     {
+        StartNextWave("skip");
+    }
+
+    // _closeReason은 로그용 퇴장 사유다(skip: 버튼·직접 호출, timeout: 정비 시간 만료).
+    private void StartNextWave(string _closeReason)
+    {
         if (phase != GamePhase.Shop)
         {
             return;
         }
+        shopCloseReason = _closeReason;
         StartWave(currentWave.wave + 1);
     }
 
@@ -281,8 +288,14 @@ public sealed partial class GameManager : MonoBehaviour
 
     private void SetPhase(GamePhase _next)
     {
+        GamePhase previous = phase;
+        ObserveShopPhase(previous, _next);
         phase = _next;
         ObserveLogging(() => telemetry.SetPhase(LogPhase(_next)));
+        if (_next == GamePhase.Shop && previous != GamePhase.Shop)
+        {
+            ObserveShopOpened();
+        }
         if (_next != GamePhase.Wave)
         {
             ClearAmmoDrops();
@@ -440,6 +453,12 @@ public sealed partial class GameManager : MonoBehaviour
 
     // 아킴보 전환(무료, 정비 시간에만). 빈 문자열이면 성공이며, 이미 그 상태여도 성공이다.
     public string TrySetAkimbo(bool _on)
+    {
+        return RunLoggedEquipment(() => new LogShopEquipmentRequest { action = "akimbo_set", akimbo = _on,
+            targetWeaponInstanceId = telemetry.Session.GetWeaponId(loadout.Active) }, () => SetAkimbo(_on));
+    }
+
+    private string SetAkimbo(bool _on)
     {
         string reason = _on ? AkimboUnavailableReason : ShopClosedReason();
         if (reason != "")
@@ -615,6 +634,11 @@ public sealed partial class GameManager : MonoBehaviour
     // 대상 칸의 원래 파츠는 보관함으로 간다. 두 무기에서 넘치는 장전탄이 예비탄에 다 들어가지 않으면 아무것도 바꾸지 않는다.
     public string TryAttachPart(PartInstance _part, int _slot)
     {
+        return RunLoggedEquipment(() => LogEquipment("part_attach", _part, null, _slot), () => AttachPart(_part, _slot));
+    }
+
+    private string AttachPart(PartInstance _part, int _slot)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -650,6 +674,11 @@ public sealed partial class GameManager : MonoBehaviour
 
     // 파츠 id로 장착. 대상 무기에 이미 같은 파츠가 있으면 실패하고, 보관함 개체 → 다른 휴대 무기에 붙은 개체 순으로 고른다.
     public string TryAttachPart(string _partId, int _slot)
+    {
+        return RunLoggedEquipment(() => LogEquipment("part_attach", null, _partId, _slot), () => AttachPart(_partId, _slot));
+    }
+
+    private string AttachPart(string _partId, int _slot)
     {
         string closed = ShopClosedReason();
         if (closed != "")
@@ -716,6 +745,12 @@ public sealed partial class GameManager : MonoBehaviour
     // 휴대 무기에 붙은 파츠 개체를 보관함으로 돌린다(무료).
     public string TryDetachPart(PartInstance _part)
     {
+        return RunLoggedEquipment(() => LogEquipment("part_detach", _part, null, _part != null && _part.AttachedTo != null &&
+            loadout.Contains(_part.AttachedTo) ? loadout.IndexOf(_part.AttachedTo) : (int?)null), () => DetachPart(_part));
+    }
+
+    private string DetachPart(PartInstance _part)
+    {
         string closed = ShopClosedReason();
         if (closed != "")
         {
@@ -758,6 +793,11 @@ public sealed partial class GameManager : MonoBehaviour
     // _slot 휴대 무기에 붙은 _partId 개체를 분리한다.
     public string TryDetachPart(string _partId, int _slot)
     {
+        return RunLoggedEquipment(() => LogEquipment("part_detach", null, _partId, _slot), () => DetachPart(_partId, _slot));
+    }
+
+    private string DetachPart(string _partId, int _slot)
+    {
         var held = loadout.Get(_slot);
         foreach (var part in held != null ? held.Parts : Array.Empty<PartInstance>())
         {
@@ -772,6 +812,11 @@ public sealed partial class GameManager : MonoBehaviour
 
     // 파츠 id로 분리. 사용 중 무기 → 아킴보 왼손 → 나머지 휴대 무기 순으로 붙은 개체를 고른다.
     public string TryDetachPart(string _partId)
+    {
+        return RunLoggedEquipment(() => LogEquipment("part_detach", null, _partId, null), () => DetachPart(_partId));
+    }
+
+    private string DetachPart(string _partId)
     {
         var order = new List<WeaponInstance> { loadout.Active, loadout.OffHand };
         for (int i = 0; i < loadout.SlotCount; i++)

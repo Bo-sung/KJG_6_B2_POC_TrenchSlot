@@ -11,7 +11,10 @@ public enum LogIdKind
     Spin,
     PurchaseAttempt,
     AmmoTransaction,
-    OfferSet
+    OfferSet,
+    ShopVisit,
+    ShopInput,
+    ShopAction
 }
 
 public sealed class LogRecord

@@ -37,6 +37,10 @@ public sealed partial class ShopPresenter : MonoBehaviour
         view.SupplyClicked += OnSupplyClicked;
         view.UpgradeClicked += OnUpgradeClicked;
         view.NextWaveClicked += OnNextWaveClicked;
+        view.FocusChanged += OnFocusChanged;
+        view.PointerEntered += OnPointerEntered;
+        view.PointerExited += OnPointerExited;
+        view.ScrollChanged += OnScrollChanged;
         gameManager.PhaseChanged += OnPhaseChanged;
         gameManager.IntermissionChanged += OnIntermissionChanged;
         gameManager.Wallet.BalanceChanged += OnWalletChanged;
@@ -68,6 +72,10 @@ public sealed partial class ShopPresenter : MonoBehaviour
             view.SupplyClicked -= OnSupplyClicked;
             view.UpgradeClicked -= OnUpgradeClicked;
             view.NextWaveClicked -= OnNextWaveClicked;
+            view.FocusChanged -= OnFocusChanged;
+            view.PointerEntered -= OnPointerEntered;
+            view.PointerExited -= OnPointerExited;
+            view.ScrollChanged -= OnScrollChanged;
         }
         if (gameManager != null)
         {
@@ -131,7 +139,7 @@ public sealed partial class ShopPresenter : MonoBehaviour
         view.SetVisible(shopOpen);
         if (!shopOpen)
         {
-            gameManager.ObserveShopExposure(false, null, null, null);
+            gameManager.ObserveShopExposure(false, null, null, null, "phase_changed");
         }
         InputGate.PlayerEnabled = !shopOpen && _phase != GameManager.GamePhase.GameOver;
         // 게임 오버 때 커서는 GameOverPresenter가 푼다. 두 Presenter가 같은 전이에서 커서를 다투지 않도록 여기서는 건드리지 않는다.
@@ -155,15 +163,21 @@ public sealed partial class ShopPresenter : MonoBehaviour
 
     // ---------- 입력 ----------
 
+    // 입력마다 using var LogInput(...)으로 조작 한 번을 기록한다. 아무 일도 하지 않은 경로는 LogIgnored로 사유를 남긴다.
     private void OnWeaponSelected(int _index)
     {
+        using var input = LogInput("weapon_select", "weapon_catalog", _index);
         if (_index >= 0 && _index < shop.weapons.Length && shop.weapons[_index] != null)
         {
-            SelectWeapon(shop.weapons[_index].weaponId);
+            SelectWeapon(shop.weapons[_index].weaponId, "weapon_catalog");
+        }
+        else
+        {
+            LogIgnored("invalid_row");
         }
     }
 
-    private void SelectWeapon(string _weaponId)
+    private void SelectWeapon(string _weaponId, string _logSource)
     {
         if (selectedWeaponId != _weaponId)
         {
@@ -171,27 +185,37 @@ public sealed partial class ShopPresenter : MonoBehaviour
             selectedPartId = "";
         }
         Refresh();
+        gameManager.ObserveShopSelection(selectedWeaponId, selectedPartId, _logSource);
     }
 
     private void OnWeaponBuyClicked(int _slot)
     {
+        using var input = LogInput("weapon_buy", "weapon_buy", _slot, _slot);
         Report(gameManager.TryBuyWeapon(selectedWeaponId, _slot, LogOffer("Weapon", selectedWeaponId, "weapon_buy", _slot)), $"{WeaponInfo.DisplayName(weapons, selectedWeaponId)} 구매 완료");
     }
 
     private void OnPartSelected(int _index)
     {
+        using var input = LogInput("part_select", "part_catalog", _index);
         if (_index >= 0 && _index < visibleParts.Count)
         {
             selectedPartId = visibleParts[_index].id;
             Refresh();
+            gameManager.ObserveShopSelection(selectedWeaponId, selectedPartId, "part_catalog");
+        }
+        else
+        {
+            LogIgnored("invalid_row");
         }
     }
 
     private void OnPartBuyClicked()
     {
+        using var input = LogInput("part_buy", "part_buy", 0);
         var part = SelectedPart();
         if (part == null)
         {
+            LogIgnored("no_part_selected");
             return;
         }
         // 구매한 개체는 같은 종류 휴대 무기에 바로 붙거나 보관함으로 간다(GameManager가 정한다). 결과 위치를 알려 준다.
@@ -204,64 +228,92 @@ public sealed partial class ShopPresenter : MonoBehaviour
     // 보관함의 개체를 우선 붙이고, 보관함이 비었으면 다른 휴대 무기에 붙은 개체를 옮긴다.
     private void OnPartAttachClicked(int _slot)
     {
+        using var input = LogInput("part_attach", "part_attach", _slot, _slot);
         var part = SelectedPart();
         var copy = part != null ? AttachSource(part, _slot) : null;
         if (copy != null)
         {
             Report(gameManager.TryAttachPart(copy, _slot), $"{part.name} #{copy.Uid} {_slot + 1}번 무기에 장착");
         }
+        else
+        {
+            LogIgnored(part == null ? "no_part_selected" : "no_attach_source");
+        }
     }
 
     private void OnPartDetachClicked(int _slot)
     {
+        using var input = LogInput("part_detach", "part_detach", _slot, _slot);
         var part = SelectedPart();
         var copy = part != null ? CopyOn(gameManager.Loadout.Get(_slot), part) : null;
         if (copy != null)
         {
             Report(gameManager.TryDetachPart(copy), $"{part.name} #{copy.Uid} 분리 · 보관함으로");
         }
+        else
+        {
+            LogIgnored(part == null ? "no_part_selected" : "part_not_on_weapon");
+        }
     }
 
     // 휴대 무기 카드를 누르면 그 무기 종류를 선택해 파츠를 바로 본다.
     private void OnSlotCardClicked(int _slot)
     {
+        using var input = LogInput("slot_card_select", "slot_card", _slot, _slot);
         var held = gameManager.Loadout.Get(_slot);
         if (held != null)
         {
-            SelectWeapon(held.WeaponId);
+            SelectWeapon(held.WeaponId, "slot_card");
+        }
+        else
+        {
+            LogIgnored("empty_slot");
         }
     }
 
     private void OnAkimboClicked()
     {
+        using var input = LogInput("akimbo_toggle", "akimbo", 0);
         bool wasOn = gameManager.IsAkimbo;
         Report(gameManager.TryToggleAkimbo(), wasOn ? "아킴보 해제" : "아킴보 전환 · 양손 사용");
     }
 
     private void OnStatClicked(int _index)
     {
+        using var input = LogInput("stat_buy", "stat", _index);
         if (_index >= 0 && _index < shop.stats.Length && shop.stats[_index] != null)
         {
             Report(gameManager.TryBuyStat(shop.stats[_index].id, LogOffer("Stat", shop.stats[_index].id, "stat")), $"{shop.stats[_index].name} 강화");
+        }
+        else
+        {
+            LogIgnored("invalid_row");
         }
     }
 
     // 보급은 탄약 팩만 판매한다. 체력은 슬롯 회전으로 회복한다.
     private void OnSupplyClicked(int _index)
     {
+        using var input = LogInput("ammo_buy", "ammo", _index);
         if (_index >= 0 && _index < shop.ammoPacks.Length && shop.ammoPacks[_index] != null)
         {
             Report(gameManager.TryBuyAmmo(shop.ammoPacks[_index].ammoId, LogOffer("Ammo", shop.ammoPacks[_index].ammoId, "ammo")), "탄약 팩 구매");
+        }
+        else
+        {
+            LogIgnored("invalid_row");
         }
     }
 
     private void OnUpgradeClicked(int _index)
     {
+        using var input = LogInput("slot_upgrade_buy", "upgrade", _index);
         Report(gameManager.TryBuySlotUpgrade(_index, LogOffer("SlotUpgrade", gameManager.SlotOffers.Get(_index), "upgrade")), "슬롯 업그레이드 구매");
     }
 
     private void OnNextWaveClicked()
     {
+        using var input = LogInput("next_wave", "next_wave", 0);
         gameManager.StartNextWave();
     }
 

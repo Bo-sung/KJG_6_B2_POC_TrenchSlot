@@ -7,9 +7,125 @@ public sealed partial class GameManager
     private LogShopCollector logShop;
     public LogShopCollector ShopLog => logShop;
 
-    public void ObserveShopExposure(bool _visible, Func<LogShopOffer[]> _capture, string _weapon, string _part)
+    private string shopCloseReason;
+    private int equipmentLogDepth;
+
+    public void ObserveShopExposure(bool _visible, Func<LogShopOffer[]> _capture, string _weapon, string _part, string _hideReason = null)
     {
-        ObserveLogging(() => logShop?.Present(_visible, wallet?.Balance, _weapon, _part, _visible ? _capture() : null));
+        ObserveLogging(() => logShop?.Present(_visible, wallet?.Balance, _weapon, _part, _visible ? _capture() : null,
+            _visible ? CaptureLogInventory() : null, _hideReason));
+    }
+
+    // 상점 UI 조작 기록. 기록 실패·비활성이면 null을 돌려줄 뿐 게임 동작에는 영향이 없다.
+    public string BeginShopInput(string _action, Func<LogShopControl> _control, int? _slot, string _weapon, string _part)
+    {
+        string id = null;
+        ObserveLogging(() => id = logShop?.BeginInput(_action, _control?.Invoke(), _slot, wallet?.Balance, _weapon, _part));
+        return id;
+    }
+
+    public void EndShopInput(string _interactionId, string _ignoredReason)
+    {
+        ObserveLogging(() => logShop?.EndInput(_interactionId, _ignoredReason));
+    }
+
+    public void ObserveShopSelection(string _weapon, string _part, string _source)
+    {
+        ObserveLogging(() => logShop?.ObserveSelection(_weapon, _part, _source, true));
+    }
+
+    public void ObserveShopFocus(Func<LogShopControl> _from, Func<LogShopControl> _to, bool _programmatic)
+    {
+        ObserveLogging(() => logShop?.ObserveFocus(_from(), _to(), _programmatic ? "programmatic" : "player"));
+    }
+
+    public void ObserveShopPointerEnter(Func<LogShopControl> _control)
+    {
+        ObserveLogging(() => logShop?.ObservePointerEnter(_control?.Invoke()));
+    }
+
+    public void ObserveShopPointerExit(Func<LogShopControl> _control)
+    {
+        ObserveLogging(() => logShop?.ObservePointerExit(_control?.Invoke()));
+    }
+
+    public void ObserveShopScroll(string _view, double? _previous, double _new, bool _programmatic)
+    {
+        ObserveLogging(() => logShop?.ObserveScroll(_view, _previous, _new, _programmatic ? "programmatic" : "player"));
+    }
+
+    private void ObserveShopPhase(GamePhase _previous, GamePhase _next)
+    {
+        if (_previous == GamePhase.Shop && _next != GamePhase.Shop)
+        {
+            string reason = shopCloseReason ?? "phase_changed";
+            ObserveLogging(() => logShop?.Closed(reason, intermissionLeft, CaptureLogShop(), null, LogPhase(_next)));
+        }
+        shopCloseReason = null;
+    }
+
+    private void ObserveShopOpened()
+    {
+        ObserveLogging(() => logShop?.Opened(ShopWave, intermissionLeft, ShopDuration, CaptureLogShop()));
+    }
+
+    // 세션이 상점 안에서 끝나면(타이틀 복귀·종료) 마지막 상태와 함께 방문을 닫는다.
+    private void ObserveShopSessionEnd(string _reason)
+    {
+        if (phase == GamePhase.Shop)
+        {
+            ObserveLogging(() => logShop?.Closed("session_end", intermissionLeft, CaptureLogShop(), _reason));
+        }
+    }
+
+    // 장착·분리·아킴보는 공개 오버로드끼리 서로 부르므로 가장 바깥 호출만 기록한다.
+    private string RunLoggedEquipment(Func<LogShopEquipmentRequest> _request, Func<string> _run)
+    {
+        if (equipmentLogDepth > 0 || logShop == null || !logShop.IsRecording)
+        {
+            return _run();
+        }
+        LogShopEquipmentRequest request = null;
+        LogShopSnapshot before = null;
+        ObserveLogging(() =>
+        {
+            request = _request();
+            before = CaptureLogShop();
+        });
+        bool returned = false;
+        string failure = null;
+        equipmentLogDepth++;
+        try
+        {
+            failure = _run();
+            returned = true;
+            return failure;
+        }
+        finally
+        {
+            equipmentLogDepth--;
+            ObserveLogging(() => logShop?.RecordEquipment(request, before, returned, failure, CaptureLogShop()));
+        }
+    }
+
+    private LogShopEquipmentRequest LogEquipment(string _action, PartInstance _part, string _partId, int? _slot)
+    {
+        WeaponInstance target = _slot.HasValue ? loadout.Get(_slot.Value) : null;
+        return new LogShopEquipmentRequest { action = _action, partId = _part != null ? _part.PartId : _partId,
+            partInstanceId = LogPartId(_part), targetSlot = _slot, targetWeaponInstanceId = telemetry.Session.GetWeaponId(target),
+            sourceWeaponInstanceId = _part != null ? telemetry.Session.GetWeaponId(_part.AttachedTo) : null };
+    }
+
+    private string LogPartId(PartInstance _part)
+    {
+        return _part != null ? telemetry.Session.SessionId + ":part:" + _part.Uid.ToString(CultureInfo.InvariantCulture) : null;
+    }
+
+    private LogShopInventory CaptureLogInventory()
+    {
+        LogPlayerSnapshot player = CaptureLogPlayer();
+        return new LogShopInventory { activeHand = player.activeHand, activeSlot = player.activeSlot, weapons = player.weapons,
+            reserves = player.reserves, parts = CaptureLogParts() };
     }
 
     public LogShopProduct QuoteLogShopProduct(string _type, string _id, int? _slot = null, int? _offerIndex = null)
@@ -115,7 +231,7 @@ public sealed partial class GameManager
         var entries = new List<LogShopPart>();
         foreach (PartInstance part in parts.Instances)
         {
-            entries.Add(new LogShopPart { instanceId = telemetry.Session.SessionId + ":part:" + part.Uid.ToString(CultureInfo.InvariantCulture),
+            entries.Add(new LogShopPart { instanceId = LogPartId(part),
                 partId = part.PartId, attachedWeaponInstanceId = telemetry.Session.GetWeaponId(part.AttachedTo) });
         }
         return entries.ToArray();

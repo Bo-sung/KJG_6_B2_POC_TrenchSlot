@@ -86,6 +86,41 @@ public sealed class LogShopUpgrade
     public bool soldOut;
 }
 
+public sealed class LogShopControl
+{
+    public string placement;
+    public int? row;
+    public string label;
+    public string priceText;
+    public bool? interactable;
+}
+
+public sealed class LogShopSelection
+{
+    public string weaponId;
+    public string partId;
+}
+
+public sealed class LogShopInventory
+{
+    public string activeHand;
+    public int? activeSlot;
+    public LogWeaponSnapshot[] weapons;
+    public LogReserveSnapshot[] reserves;
+    public LogShopPart[] parts;
+}
+
+public sealed class LogShopEquipmentRequest
+{
+    public string action;
+    public string partId;
+    public string partInstanceId;
+    public int? targetSlot;
+    public string targetWeaponInstanceId;
+    public string sourceWeaponInstanceId;
+    public bool? akimbo;
+}
+
 public sealed class LogPurchaseContext
 {
     public string AttemptId { get; }
@@ -113,7 +148,15 @@ public sealed class LogShopCollector : ILogSessionEndObserver
     private JToken presentation;
     private string offerSetId;
     private int revision;
+    private string visitId;
+    private double visitStartedSeconds;
+    private bool shown;
+    private JToken selection;
+    private string inputId;
+    private bool inputLinked;
     public bool IsRecording => Active;
+    public string VisitId => visitId;
+    public string InputId => inputId;
 
     public LogShopCollector(LogGameLifecycle _lifecycle)
     {
@@ -126,26 +169,42 @@ public sealed class LogShopCollector : ILogSessionEndObserver
         return string.IsNullOrEmpty(_id) ? null : _type + ":" + Uri.EscapeDataString(_id);
     }
 
-    public void Present(bool _visible, int? _balance, string _weapon, string _part, LogShopOffer[] _offers)
+    public void Present(bool _visible, int? _balance, string _weapon, string _part, LogShopOffer[] _offers,
+        LogShopInventory _inventory = null, string _hideReason = null)
     {
         if (!_visible)
         {
-            offerSetId = null;
-            presentation = null;
-            revision = 0;
+            Observe(() => Hide(_hideReason ?? "not_visible"));
+            shown = false;
+            ResetPresentation();
             return;
         }
         Observe(() =>
         {
+            if (!shown)
+            {
+                JToken initial = LogJson.CopyPayload(new LogShopSelection { weaponId = _weapon, partId = _part });
+                if (!lifecycle.Session.TryRecord("shop_view_shown", new { visitId, selection = initial, inventory = _inventory }))
+                {
+                    return;
+                }
+                shown = true;
+                selection = initial;
+            }
+            ObserveSelection(_weapon, _part, "refresh", false);
             JToken next = LogJson.CopyPayload(new { balance = _balance, selectedWeaponId = _weapon, selectedPartId = _part,
                 offers = _offers ?? Array.Empty<LogShopOffer>() });
+            if (_inventory != null)
+            {
+                next["inventory"] = LogJson.CopyPayload(_inventory);
+            }
             if (JToken.DeepEquals(next, presentation))
             {
                 return;
             }
             string nextSet = offerSetId ?? lifecycle.Session.NewId(LogIdKind.OfferSet);
             int nextRevision = offerSetId == null ? 0 : revision + 1;
-            if (lifecycle.Session.TryRecord("shop_offers_presented", new { offerSetId = nextSet, revision = nextRevision, presentation = next }))
+            if (lifecycle.Session.TryRecord("shop_offers_presented", new { offerSetId = nextSet, revision = nextRevision, presentation = next, visitId }))
             {
                 offerSetId = nextSet;
                 revision = nextRevision;
@@ -153,10 +212,194 @@ public sealed class LogShopCollector : ILogSessionEndObserver
             }
             else
             {
-                Present(false, null, null, null, null);
+                ResetPresentation();
             }
         });
     }
+
+    // 정비 시간 진입. 화면 표시(shop_view_shown)와 별개로 게임 상태가 상점으로 바뀐 순간이다.
+    public void Opened(int? _nextWave, double? _intermissionSeconds, double? _duration, LogShopSnapshot _state)
+    {
+        Observe(() =>
+        {
+            if (visitId != null)
+            {
+                CloseVisit("reopened", null, null, null, null);
+            }
+            string id = lifecycle.Session.NewId(LogIdKind.ShopVisit);
+            if (lifecycle.Session.TryRecord("shop_opened", new { visitId = id, nextWaveNumber = _nextWave,
+                intermissionSeconds = _intermissionSeconds, durationSeconds = _duration, utc = lifecycle.Session.ReadUtc(),
+                state = LogJson.CopyPayload(_state) }))
+            {
+                visitId = id;
+                visitStartedSeconds = lifecycle.Session.ElapsedSeconds;
+                selection = null;
+            }
+        });
+    }
+
+    // _reason: skip(다음 웨이브 버튼·직접 호출) / timeout(정비 시간 만료) / phase_changed / session_end.
+    public void Closed(string _reason, double? _intermissionLeft, LogShopSnapshot _state, string _detail = null, string _nextPhase = null)
+    {
+        Observe(() => CloseVisit(_reason, _intermissionLeft, _state, _detail, _nextPhase));
+    }
+
+    // 플레이어 조작 한 번. 이후 같은 조작으로 생긴 선택·구매·장착·퇴장 이벤트가 interactionId로 이어진다.
+    public string BeginInput(string _action, LogShopControl _control, int? _targetSlot, int? _balance, string _weapon, string _part)
+    {
+        string id = null;
+        Observe(() =>
+        {
+            if (inputId != null)
+            {
+                EndInput(inputId, "superseded");
+            }
+            string next = lifecycle.Session.NewId(LogIdKind.ShopInput);
+            if (lifecycle.Session.TryRecord("shop_ui_input", new { interactionId = next, visitId, action = _action, control = _control,
+                targetSlot = _targetSlot, balance = _balance, selection = new LogShopSelection { weaponId = _weapon, partId = _part },
+                visitElapsedSeconds = VisitElapsed() }))
+            {
+                id = next;
+                inputId = next;
+                inputLinked = false;
+            }
+        });
+        return id;
+    }
+
+    // 조작이 아무 게임 이벤트도 만들지 않았으면 그 사유를 남긴다.
+    public void EndInput(string _interactionId, string _ignoredReason)
+    {
+        if (_interactionId == null || _interactionId != inputId)
+        {
+            return;
+        }
+        bool linked = inputLinked;
+        inputId = null;
+        inputLinked = false;
+        if (!linked)
+        {
+            Observe(() => lifecycle.Session.TryRecord("shop_ui_input_ignored", new { interactionId = _interactionId, visitId,
+                reason = _ignoredReason ?? "no_effect" }));
+        }
+    }
+
+    // _explicit: 선택 조작이면 값이 그대로여도 기록한다. 아니면 바뀐 경우만 기록한다(자동 선택 등).
+    public void ObserveSelection(string _weapon, string _part, string _source, bool _explicit)
+    {
+        Observe(() =>
+        {
+            JToken next = LogJson.CopyPayload(new LogShopSelection { weaponId = _weapon, partId = _part });
+            bool changed = !JToken.DeepEquals(next, selection);
+            if ((!changed && !_explicit) || (!changed && inputId == null))
+            {
+                return;
+            }
+            if (RecordLinked("shop_selection_changed", new { visitId, interactionId = inputId, source = _source, changed,
+                before = selection, after = next }))
+            {
+                selection = next;
+            }
+        });
+    }
+
+    // 키보드·게임패드 탐색 또는 클릭으로 바뀐 UI 포커스. cause=programmatic은 화면 코드가 옮긴 경우다.
+    public void ObserveFocus(LogShopControl _from, LogShopControl _to, string _cause)
+    {
+        Observe(() => lifecycle.Session.TryRecord("shop_focus_changed", new { visitId, interactionId = inputId, cause = _cause,
+            from = _from, to = _to }));
+    }
+
+    // 마우스 포인터 진입 (호버).
+    public void ObservePointerEnter(LogShopControl _control)
+    {
+        Observe(() => lifecycle.Session.TryRecord("shop_pointer_enter", new { visitId, interactionId = inputId, control = _control }));
+    }
+
+    // 마우스 포인터 이탈.
+    public void ObservePointerExit(LogShopControl _control)
+    {
+        Observe(() => lifecycle.Session.TryRecord("shop_pointer_exit", new { visitId, interactionId = inputId, control = _control }));
+    }
+
+    // 스크롤 위치 변화 (뷰 이름, 이전 정규화 위치, 새 정규화 위치, 발생 원인).
+    public void ObserveScroll(string _view, double? _previousPosition, double _newPosition, string _cause)
+    {
+        if (_previousPosition.HasValue && Math.Abs(_previousPosition.Value - _newPosition) < 1e-6)
+        {
+            return;
+        }
+        Observe(() => lifecycle.Session.TryRecord("shop_scroll_changed", new { visitId, interactionId = inputId,
+            view = _view, previousPosition = _previousPosition, newPosition = _newPosition, before = _previousPosition, after = _newPosition, cause = _cause }));
+    }
+
+    // 파츠 장착·분리·아킴보 전환의 게임 결과. 무료 조작이라 구매(shop_purchase_*)와 나눈다.
+    public void RecordEquipment(LogShopEquipmentRequest _request, LogShopSnapshot _before, bool _returned, string _failure, LogShopSnapshot _after)
+    {
+        Observe(() =>
+        {
+            JToken before = LogJson.CopyPayload(_before);
+            JToken after = LogJson.CopyPayload(_after);
+            bool success = _returned && string.IsNullOrEmpty(_failure);
+            bool changed = !JToken.DeepEquals(Field(before, "parts"), Field(after, "parts")) ||
+                !JToken.DeepEquals(Field(Field(before, "player"), "weapons"), Field(Field(after, "player"), "weapons")) ||
+                !JToken.DeepEquals(Field(Field(before, "player"), "activeHand"), Field(Field(after, "player"), "activeHand"));
+            RecordLinked("shop_equipment_result", new { actionId = lifecycle.Session.NewId(LogIdKind.ShopAction), visitId,
+                interactionId = inputId, request = _request, success, changed,
+                failureCode = success ? null : _returned ? FailureCode(_failure) : "exception",
+                displayReason = _failure, before, after });
+        });
+    }
+
+    private void CloseVisit(string _reason, double? _intermissionLeft, LogShopSnapshot _state, string _detail, string _nextPhase)
+    {
+        if (visitId == null)
+        {
+            return;
+        }
+        Hide("shop_closed");
+        try
+        {
+            RecordLinked("shop_closed", new { visitId, reason = _reason, detail = _detail, nextPhase = _nextPhase, interactionId = inputId,
+                intermissionLeft = _intermissionLeft, dwellSeconds = VisitElapsed(), utc = lifecycle.Session.ReadUtc(),
+                state = LogJson.CopyPayload(_state) });
+        }
+        finally
+        {
+            visitId = null;
+            selection = null;
+            ResetPresentation();
+        }
+    }
+
+    private void Hide(string _reason)
+    {
+        if (!shown)
+        {
+            return;
+        }
+        shown = false;
+        lifecycle.Session.TryRecord("shop_view_hidden", new { visitId, reason = _reason, offerSetId, revision = offerSetId != null ? revision : (int?)null });
+    }
+
+    private void ResetPresentation()
+    {
+        offerSetId = null;
+        presentation = null;
+        revision = 0;
+    }
+
+    private bool RecordLinked(string _eventType, object _payload)
+    {
+        bool recorded = lifecycle.Session.TryRecord(_eventType, _payload);
+        if (recorded && inputId != null)
+        {
+            inputLinked = true;
+        }
+        return recorded;
+    }
+
+    private double? VisitElapsed() => visitId != null ? lifecycle.Session.ElapsedSeconds - visitStartedSeconds : (double?)null;
 
     public LogShopOfferReference FindOffer(string _type, string _id, string _placement, int? _targetSlot = null)
     {
@@ -194,7 +437,7 @@ public sealed class LogShopCollector : ILogSessionEndObserver
                 offer = LogJson.CopyPayload(_reference);
             }
             var candidate = new LogPurchaseContext(this, lifecycle.Session.NewId(LogIdKind.PurchaseAttempt), product, before, offer);
-            if (lifecycle.Session.TryRecord("shop_purchase_attempt", new { attemptId = candidate.AttemptId, product, offer, before }))
+            if (RecordLinked("shop_purchase_attempt", new { attemptId = candidate.AttemptId, product, offer, before, visitId, interactionId = inputId }))
             {
                 context = candidate;
                 pending.Add(context);
@@ -265,7 +508,9 @@ public sealed class LogShopCollector : ILogSessionEndObserver
         {
             Incomplete(context, _reason);
         }
-        Present(false, null, null, null, null);
+        EndInput(inputId, "session_end");
+        Observe(() => CloseVisit("session_end", null, null, _reason, null));
+        Present(false, null, null, null, null, null, "session_end");
     }
 
     public static string FailureCode(string _reason)
@@ -291,6 +536,15 @@ public sealed class LogShopCollector : ILogSessionEndObserver
             case "보충할 예비탄이 없습니다.": return "no_effect";
             case "품절입니다.": return "sold_out";
             case "이미 구매했습니다.": return "already_purchased";
+            case "보유하지 않은 파츠입니다.": return "part_not_owned";
+            case "이 파츠를 붙일 수 없는 무기입니다.": return "incompatible_weapon";
+            case "바닥에 놓인 무기에 붙어 있습니다. 그 무기를 주워야 옮길 수 있습니다.": return "attached_to_ground_weapon";
+            case "이미 장착되어 있습니다.": return "already_attached";
+            case "탄창이 줄어 남는 장전탄을 돌려받을 예비탄 칸이 없습니다.": return "ammo_overflow";
+            case "휴대 무기에 장착된 파츠가 아닙니다.":
+            case "그 무기에 장착된 파츠가 아닙니다.": return "part_not_attached";
+            case "권총류만 아킴보로 들 수 있습니다.": return "akimbo_not_pistol";
+            case "같은 권총 두 자루가 필요합니다.": return "akimbo_needs_pair";
             default: return "unknown";
         }
     }

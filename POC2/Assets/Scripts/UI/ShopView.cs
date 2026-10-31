@@ -5,6 +5,15 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
+public sealed class ShopPointerTrigger : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    public event Action Entered;
+    public event Action Exited;
+
+    public void OnPointerEnter(PointerEventData _eventData) => Entered?.Invoke();
+    public void OnPointerExit(PointerEventData _eventData) => Exited?.Invoke();
+}
+
 // 정비 상점 화면(View). 2열 구성:
 // 왼쪽 = 무기 판매(목록·상세·구매) / 선택 무기의 파츠(칩·상세·구매·슬롯별 장착·분리) / 스탯 상시 판매,
 // 오른쪽 = 유저 정보(휴대 무기 개체·아킴보 토글·보관품·바닥 무기) / 보급 / 슬롯 업그레이드.
@@ -51,6 +60,13 @@ public sealed class ShopView : MonoBehaviour
     public event Action<int> SupplyClicked;
     public event Action<int> UpgradeClicked;
     public event Action NextWaveClicked;
+    // 포커스(선택된 UI)가 바뀐 순간. (이전, 다음, 화면 코드가 옮겼는지). 같은 포커스가 유지되는 프레임에는 오지 않는다.
+    public event Action<GameObject, GameObject, bool> FocusChanged;
+    // 마우스 포인터 진입·이탈.
+    public event Action<GameObject> PointerEntered;
+    public event Action<GameObject> PointerExited;
+    // 스크롤 위치 변화 (뷰 이름, 이전 정규화 위치, 새 정규화 위치, 화면 코드가 옮겼는지).
+    public event Action<string, float?, float, bool> ScrollChanged;
 
     public int WeaponRowCount => weaponRows.Length;
     public int WeaponBuyCount => weaponBuyButtons.Length;
@@ -62,6 +78,13 @@ public sealed class ShopView : MonoBehaviour
     public int UpgradeRowCount => upgradeRows.Length;
 
     private GameObject lastSelected;
+    private GameObject programmaticFocus;
+    private GameObject logFocus;
+    private GameObject currentHovered;
+    private float[] lastScrollPositions = Array.Empty<float>();
+    private float[] scrollStartPositions = Array.Empty<float>();
+    private bool[] isScrolling = Array.Empty<bool>();
+    private int[] stationaryFrames = Array.Empty<int>();
     private readonly Vector3[] logCorners = new Vector3[4];
     private readonly List<CanvasGroup> logGroups = new List<CanvasGroup>();
     private readonly List<RectMask2D> logRectMasks = new List<RectMask2D>();
@@ -74,6 +97,11 @@ public sealed class ShopView : MonoBehaviour
         if (!IsLogVisible)
         {
             return null;
+        }
+        if (_placement == "next_wave")
+        {
+            return nextWaveButton != null && IsLogRectVisible(nextWaveButton.transform as RectTransform)
+                ? new LogShopRowState { label = nextWaveButton.GetComponentInChildren<TMP_Text>()?.text, interactable = nextWaveButton.IsInteractable() } : null;
         }
         if (_placement == "weapon_detail" || _placement == "part_detail")
         {
@@ -90,8 +118,11 @@ public sealed class ShopView : MonoBehaviour
             case "stat": rows = statRows; break;
             case "ammo": rows = supplyRows; break;
             case "upgrade": rows = upgradeRows; break;
+            case "part_attach": rows = partAttachButtons; break;
+            case "part_detach": rows = partDetachButtons; break;
+            case "slot_card": rows = slotCards; break;
         }
-        ShopRowView row = _placement == "part_buy" ? partBuyButton :
+        ShopRowView row = _placement == "part_buy" ? partBuyButton : _placement == "akimbo" ? akimboButton :
             rows != null && _index >= 0 && _index < rows.Length ? rows[_index] : null;
         if (row == null || !IsLogRectVisible(row.transform as RectTransform))
         {
@@ -99,6 +130,64 @@ public sealed class ShopView : MonoBehaviour
         }
         return new LogShopRowState { label = row.LogLabel, priceText = row.LogPrice,
             interactable = row.Button != null && row.Button.IsInteractable() };
+    }
+
+    // 로그용 UI 위치. 상점 버튼이 아니면 placement=null을 돌려준다.
+    public string LogPlacementOf(GameObject _target, out int _row)
+    {
+        _row = -1;
+        if (_target == null)
+        {
+            return null;
+        }
+        if (nextWaveButton != null && _target == nextWaveButton.gameObject)
+        {
+            return "next_wave";
+        }
+        if (partBuyButton != null && (_target == partBuyButton.Button?.gameObject || _target == partBuyButton.gameObject))
+        {
+            return "part_buy";
+        }
+        if (akimboButton != null && (_target == akimboButton.Button?.gameObject || _target == akimboButton.gameObject))
+        {
+            return "akimbo";
+        }
+        string[] names = { "weapon_catalog", "weapon_buy", "part_catalog", "part_attach", "part_detach", "slot_card", "stat", "ammo", "upgrade" };
+        ShopRowView[][] groups = { weaponRows, weaponBuyButtons, partChips, partAttachButtons, partDetachButtons, slotCards, statRows, supplyRows, upgradeRows };
+        for (int g = 0; g < groups.Length; g++)
+        {
+            for (int i = 0; i < groups[g].Length; i++)
+            {
+                if (groups[g][i] != null && (_target == groups[g][i].Button?.gameObject || _target == groups[g][i].gameObject))
+                {
+                    _row = i;
+                    return names[g];
+                }
+            }
+        }
+        return panel != null && _target.transform.IsChildOf(panel.transform) ? "shop_other" : null;
+    }
+
+    public string LogViewOf(ScrollRect _scroll)
+    {
+        if (_scroll == null)
+        {
+            return null;
+        }
+        string name = _scroll.gameObject.name;
+        if (name.IndexOf("Weapon", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "weapon_catalog";
+        }
+        if (name.IndexOf("Inventory", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "inventory";
+        }
+        if (name.IndexOf("Supply", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "ammo";
+        }
+        return name;
     }
 
     private bool IsLogRectVisible(RectTransform _rect)
@@ -186,6 +275,81 @@ public sealed class ShopView : MonoBehaviour
         if (nextWaveButton != null)
         {
             nextWaveButton.onClick.AddListener(() => NextWaveClicked?.Invoke());
+            var trigger = nextWaveButton.gameObject.AddComponent<ShopPointerTrigger>();
+            trigger.Entered += () => OnPointerEntered(nextWaveButton.gameObject);
+            trigger.Exited += () => OnPointerExited(nextWaveButton.gameObject);
+        }
+
+        BindPointer(weaponRows);
+        BindPointer(weaponBuyButtons);
+        BindPointer(partChips);
+        BindPointer(partAttachButtons);
+        BindPointer(partDetachButtons);
+        BindPointer(slotCards);
+        BindPointer(statRows);
+        BindPointer(supplyRows);
+        BindPointer(upgradeRows);
+        BindPointerRow(partBuyButton);
+        BindPointerRow(akimboButton);
+
+        lastScrollPositions = new float[scrolls.Length];
+        scrollStartPositions = new float[scrolls.Length];
+        isScrolling = new bool[scrolls.Length];
+        stationaryFrames = new int[scrolls.Length];
+        for (int i = 0; i < scrolls.Length; i++)
+        {
+            if (scrolls[i] != null)
+            {
+                lastScrollPositions[i] = scrolls[i].verticalNormalizedPosition;
+                scrollStartPositions[i] = scrolls[i].verticalNormalizedPosition;
+            }
+        }
+    }
+
+    private void BindPointer(ShopRowView[] _rows)
+    {
+        if (_rows == null)
+        {
+            return;
+        }
+        foreach (var row in _rows)
+        {
+            BindPointerRow(row);
+        }
+    }
+
+    private void BindPointerRow(ShopRowView _row)
+    {
+        if (_row != null)
+        {
+            _row.PointerEntered += () => OnPointerEntered(_row.gameObject);
+            _row.PointerExited += () => OnPointerExited(_row.gameObject);
+        }
+    }
+
+    private void OnPointerEntered(GameObject _target)
+    {
+        if (_target == null || !IsLogVisible)
+        {
+            return;
+        }
+        if (currentHovered == _target)
+        {
+            return;
+        }
+        currentHovered = _target;
+        PointerEntered?.Invoke(_target);
+    }
+
+    private void OnPointerExited(GameObject _target)
+    {
+        if (currentHovered == _target)
+        {
+            currentHovered = null;
+        }
+        if (IsLogVisible)
+        {
+            PointerExited?.Invoke(_target);
         }
     }
 
@@ -197,6 +361,49 @@ public sealed class ShopView : MonoBehaviour
             return;
         }
         var selected = EventSystem.current.currentSelectedGameObject;
+        if (selected != logFocus)
+        {
+            var previous = logFocus;
+            logFocus = selected;
+            bool programmatic = selected != null && selected == programmaticFocus;
+            programmaticFocus = null;
+            FocusChanged?.Invoke(previous, selected, programmatic);
+        }
+
+        for (int i = 0; i < scrolls.Length; i++)
+        {
+            var scroll = scrolls[i];
+            if (scroll == null)
+            {
+                continue;
+            }
+            float current = scroll.verticalNormalizedPosition;
+            float last = lastScrollPositions[i];
+            if (Mathf.Abs(current - last) > 1e-4f)
+            {
+                if (!isScrolling[i])
+                {
+                    isScrolling[i] = true;
+                    scrollStartPositions[i] = last;
+                }
+                lastScrollPositions[i] = current;
+                stationaryFrames[i] = 0;
+            }
+            else if (isScrolling[i])
+            {
+                stationaryFrames[i]++;
+                if (stationaryFrames[i] >= 2)
+                {
+                    isScrolling[i] = false;
+                    float start = scrollStartPositions[i];
+                    if (Mathf.Abs(start - current) > 1e-4f)
+                    {
+                        ScrollChanged?.Invoke(LogViewOf(scroll), start, current, false);
+                    }
+                }
+            }
+        }
+
         if (selected == lastSelected)
         {
             return;
@@ -216,7 +423,7 @@ public sealed class ShopView : MonoBehaviour
         }
     }
 
-    private static void ScrollIntoView(ScrollRect _scroll, RectTransform _item)
+    private void ScrollIntoView(ScrollRect _scroll, RectTransform _item)
     {
         var viewport = _scroll.viewport != null ? _scroll.viewport : (RectTransform)_scroll.transform;
         var content = _scroll.content;
@@ -240,10 +447,22 @@ public sealed class ShopView : MonoBehaviour
         }
         if (shift != 0f)
         {
+            float beforeNorm = _scroll.verticalNormalizedPosition;
             // 위로 넘친 줄은 내용을 내리고, 아래로 넘친 줄은 올린다.
             var position = content.anchoredPosition;
             position.y = Mathf.Clamp(position.y - shift, 0f, overflow);
             content.anchoredPosition = position;
+            float afterNorm = _scroll.verticalNormalizedPosition;
+            int idx = Array.IndexOf(scrolls, _scroll);
+            if (idx >= 0 && idx < lastScrollPositions.Length)
+            {
+                lastScrollPositions[idx] = afterNorm;
+                isScrolling[idx] = false;
+            }
+            if (Mathf.Abs(beforeNorm - afterNorm) > 1e-4f)
+            {
+                ScrollChanged?.Invoke(LogViewOf(_scroll), beforeNorm, afterNorm, true);
+            }
         }
     }
 
@@ -266,14 +485,50 @@ public sealed class ShopView : MonoBehaviour
             return;
         }
         panel.SetActive(_visible);
+        logFocus = null;
+        programmaticFocus = null;
         if (_visible)
         {
-            foreach (var scroll in scrolls)
+            for (int i = 0; i < scrolls.Length; i++)
             {
+                var scroll = scrolls[i];
                 if (scroll != null)
                 {
+                    float before = scroll.verticalNormalizedPosition;
                     scroll.verticalNormalizedPosition = 1f;
+                    if (i < lastScrollPositions.Length)
+                    {
+                        lastScrollPositions[i] = 1f;
+                        isScrolling[i] = false;
+                        stationaryFrames[i] = 0;
+                    }
+                    if (Mathf.Abs(before - 1f) > 1e-4f)
+                    {
+                        ScrollChanged?.Invoke(LogViewOf(scroll), before, 1f, true);
+                    }
                 }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < scrolls.Length; i++)
+            {
+                if (i < isScrolling.Length && isScrolling[i] && scrolls[i] != null)
+                {
+                    isScrolling[i] = false;
+                    float start = scrollStartPositions[i];
+                    float current = scrolls[i].verticalNormalizedPosition;
+                    if (Mathf.Abs(start - current) > 1e-4f)
+                    {
+                        ScrollChanged?.Invoke(LogViewOf(scrolls[i]), start, current, false);
+                    }
+                }
+            }
+            if (currentHovered != null)
+            {
+                var prev = currentHovered;
+                currentHovered = null;
+                PointerExited?.Invoke(prev);
             }
         }
         if (EventSystem.current == null)
@@ -285,6 +540,7 @@ public sealed class ShopView : MonoBehaviour
         {
             if (nextWaveButton != null)
             {
+                programmaticFocus = nextWaveButton.gameObject;
                 EventSystem.current.SetSelectedGameObject(nextWaveButton.gameObject);
             }
             return;
@@ -432,6 +688,7 @@ public sealed class ShopView : MonoBehaviour
         if (selected == null || (selected.transform.IsChildOf(panel.transform) &&
             (control == null || !control.IsInteractable() || !control.IsActive())))
         {
+            programmaticFocus = nextWaveButton.gameObject;
             EventSystem.current.SetSelectedGameObject(nextWaveButton.gameObject);
         }
     }

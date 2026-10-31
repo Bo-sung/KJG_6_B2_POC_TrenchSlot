@@ -230,6 +230,7 @@ public sealed partial class GameManager
         LogEnemySnapshot enemies = null;
         ObserveLogging(() => player = CaptureLogPlayer());
         ObserveLogging(() => enemies = CaptureLogEnemies());
+        ObserveShopSessionEnd(_death ? "death" : _reason);
         ObserveLogging(() => telemetry.End(_reason, player, enemies, _death));
     }
 

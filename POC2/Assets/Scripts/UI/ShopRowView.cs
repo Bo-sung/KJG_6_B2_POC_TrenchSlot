@@ -1,10 +1,11 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // 상점 한 줄(버튼 + 이름 + 가격). 선택·사용 중 줄은 밝은 청색으로 칠한다. 구조는 프리팹에서 정하고 내용은 ShopPresenter가 ShopView를 거쳐 넣는다.
-public sealed class ShopRowView : MonoBehaviour
+public sealed class ShopRowView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     private static readonly Color SELECTED_COLOR = new Color(0.212f, 0.373f, 0.475f, 1f);
 
@@ -16,10 +17,22 @@ public sealed class ShopRowView : MonoBehaviour
     [SerializeField] private Color normalColor = new Color(0.188f, 0.275f, 0.353f, 1f);
 
     public event Action Clicked;
+    public event Action PointerEntered;
+    public event Action PointerExited;
 
     public Button Button => button;
     public string LogLabel => label != null ? label.text : null;
     public string LogPrice => price != null ? price.text : null;
+
+    public void OnPointerEnter(PointerEventData _eventData)
+    {
+        PointerEntered?.Invoke();
+    }
+
+    public void OnPointerExit(PointerEventData _eventData)
+    {
+        PointerExited?.Invoke();
+    }
 
     private void Awake()
     {

@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -27,6 +29,7 @@ public static class PocShopUiVerification
     private static readonly Stack<IEnumerator> STEPS = new Stack<IEnumerator>();
     private static int passes;
     private static int failures;
+    private static int clicks;
     private static int lastFrame = -1;
     private static bool initialized;
     private static float deadline;
@@ -165,6 +168,7 @@ public static class PocShopUiVerification
                 initialized = true;
                 passes = 0;
                 failures = 0;
+                clicks = 0;
                 deadline = Time.realtimeSinceStartup + 120f;
                 Application.logMessageReceived += OnLog;
                 STEPS.Push(Scenarios());
@@ -277,6 +281,75 @@ public static class PocShopUiVerification
         var viewport = ((ScrollRect[])Get(view, "scrolls"))[0].viewport;
         Check(Inside(viewport, (RectTransform)last.transform), "선택한 마지막 무기 줄이 스크롤되어 보임");
         CheckRuntimeLayout("조작 후");
+
+        // 상점 로그: 다음 웨이브 버튼(skip)으로 나간 뒤, 다음 정비 시간은 시간 만료(timeout)로 나간다.
+        var nextWave = (Button)Get(view, "nextWaveButton");
+        Check(nextWave != null && nextWave.IsInteractable(), "다음 웨이브 버튼 사용 가능");
+        nextWave.onClick.Invoke();
+        yield return Wait(() => game.Phase == GameManager.GamePhase.Wave, 3f, "다음 웨이브 버튼으로 상점 퇴장");
+        Set(game, "waveTimeLeft", 0.001f);
+        yield return Wait(() => game.Phase == GameManager.GamePhase.Shop, 3f, "2웨이브 종료 후 상점 재진입");
+        yield return Frames(2);
+        Set(game, "intermissionLeft", 0.001f);
+        yield return Wait(() => game.Phase == GameManager.GamePhase.Wave, 3f, "정비 시간 만료로 상점 퇴장");
+        CheckShopTelemetry();
+    }
+
+    // 지금 세션 파일에서 상점 이벤트를 읽어 실제 버튼 경로가 남긴 기록을 확인한다.
+    private static void CheckShopTelemetry()
+    {
+        var session = game.Telemetry?.Session;
+        Check(session != null && session.IsRecording, "텔레메트리 세션 기록 중");
+        if (session == null || !session.IsRecording)
+        {
+            return;
+        }
+        session.Flush();
+        string file = Path.Combine(Application.persistentDataPath, "Telemetry", session.SessionId + ".jsonl");
+        var rows = new List<JObject>();
+        using (var reader = new StreamReader(new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
+        {
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    rows.Add(JObject.Parse(line));
+                }
+            }
+        }
+        JObject[] Of(string _type) => rows.Where(_row => (string)_row["eventType"] == _type).ToArray();
+        var opened = Of("shop_opened");
+        var closed = Of("shop_closed");
+        Check(opened.Length == 2 && closed.Length == 2 && opened.Select(_r => (string)_r["payload"]["visitId"]).SequenceEqual(closed.Select(_r => (string)_r["payload"]["visitId"])),
+            $"상점 방문 2회가 열림·닫힘 쌍으로 기록 (열림 {opened.Length}, 닫힘 {closed.Length})");
+        var inputs = Of("shop_ui_input");
+        var skip = closed.FirstOrDefault(_r => (string)_r["payload"]["reason"] == "skip");
+        var skipInput = skip != null ? inputs.FirstOrDefault(_r => (string)_r["payload"]["interactionId"] == (string)skip["payload"]["interactionId"]) : null;
+        Check(skipInput != null && (string)skipInput["payload"]["action"] == "next_wave", "skip 퇴장이 다음 웨이브 버튼 입력과 연결");
+        var timeout = closed.FirstOrDefault(_r => (string)_r["payload"]["reason"] == "timeout");
+        Check(timeout != null && timeout["payload"]["interactionId"].Type == JTokenType.Null && (string)timeout["payload"]["nextPhase"] == "wave",
+            "시간 만료 퇴장은 timeout이며 입력과 연결되지 않음");
+        Check(inputs.Length == clicks + 1, $"누른 상점 버튼마다 입력 기록 1개 (클릭 {clicks + 1}, 기록 {inputs.Length})");
+        var linked = new HashSet<string>(rows.Where(_r => (string)_r["eventType"] != "shop_ui_input" && _r["payload"]?["interactionId"] != null &&
+            _r["payload"]["interactionId"].Type == JTokenType.String).Select(_r => (string)_r["payload"]["interactionId"]));
+        Check(inputs.All(_r => linked.Contains((string)_r["payload"]["interactionId"])), "모든 입력이 결과 이벤트 또는 무시 사유와 연결");
+        var attempts = Of("shop_purchase_attempt");
+        Check(attempts.Length >= 5 && attempts.All(_r => _r["payload"]["interactionId"].Type == JTokenType.String && _r["payload"]["offer"].Type == JTokenType.Object),
+            $"UI 구매 시도는 입력·진열 기록과 연결 ({attempts.Length})");
+        Check(Of("shop_purchase_result").Length == attempts.Length && Of("shop_purchase_result").All(_r => (bool)_r["payload"]["success"]),
+            "UI 구매 결과가 시도와 같은 수이며 성공으로만 기록");
+        var equipment = Of("shop_equipment_result");
+        Check(equipment.Select(_r => (string)_r["payload"]["request"]["action"]).SequenceEqual(new[] { "part_detach", "part_attach", "akimbo_set", "akimbo_set" }) &&
+            equipment.All(_r => (bool)_r["payload"]["success"] && (bool)_r["payload"]["changed"]), "분리·장착·아킴보 ON/OFF 결과가 변화와 함께 기록");
+        var sources = new HashSet<string>(Of("shop_selection_changed").Select(_r => (string)_r["payload"]["source"]));
+        Check(sources.Contains("weapon_catalog") && sources.Contains("part_catalog") && sources.Contains("slot_card"), "무기 목록·파츠 칩·슬롯 카드 선택 기록");
+        Check(Of("shop_view_shown").Length == 2 && Of("shop_view_hidden").Length == 2 && Of("shop_offers_presented").Length > 0, "화면 표시·숨김이 방문마다 한 번");
+        var focus = Of("shop_focus_changed");
+        Check(focus.Any(_r => (string)_r["payload"]["cause"] == "programmatic") && focus.Any(_r => (string)_r["payload"]["to"]?["placement"]?.ToString() == "weapon_catalog"),
+            "열 때 자동 포커스와 목록 탐색 포커스 기록");
+        Check(rows.Where(_r => ((string)_r["eventType"]).StartsWith("shop_", StringComparison.Ordinal)).All(_r => (string)_r["phase"] == "shop"),
+            "상점 이벤트는 모두 shop 단계 문맥");
     }
 
     // 실제 Canvas 배율 기준. 기준 배치가 화면 안에 들어오고, 핵심 글이 잘리지 않는다.
@@ -422,6 +495,7 @@ public static class PocShopUiVerification
         Check(usable, $"버튼 사용 가능: {_label}");
         if (usable)
         {
+            clicks++;
             _row.Button.onClick.Invoke();
         }
         yield return Frames(2);

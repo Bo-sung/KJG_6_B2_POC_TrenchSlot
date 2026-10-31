@@ -113,6 +113,15 @@ public static class PocTelemetryVerification
                 }
             }
         }
+        var visitOpens = rows.Where(_row => (string)_row["eventType"] == "shop_opened").Select(_row => (string)_row["payload"]["visitId"]).ToArray();
+        var visitCloses = rows.Where(_row => (string)_row["eventType"] == "shop_closed").Select(_row => (string)_row["payload"]["visitId"]).ToArray();
+        Require(visitOpens.All(_id => !string.IsNullOrEmpty(_id)) && visitOpens.Distinct().Count() == visitOpens.Length &&
+            visitOpens.SequenceEqual(visitCloses), "Each shop visit must open and close exactly once, in order");
+        var inputIds = rows.Where(_row => (string)_row["eventType"] == "shop_ui_input").Select(_row => (string)_row["payload"]["interactionId"]).ToArray();
+        var linkedInputs = new System.Collections.Generic.HashSet<string>(rows.Where(_row => (string)_row["eventType"] != "shop_ui_input" &&
+            _row["payload"] is JObject payload && payload["interactionId"]?.Type == JTokenType.String).Select(_row => (string)_row["payload"]["interactionId"]));
+        Require(inputIds.Distinct().Count() == inputIds.Length && inputIds.All(linkedInputs.Contains),
+            "Each shop UI input must be unique and resolve to an outcome or ignored reason");
         Debug.Log("[PocTelemetryVerification] PASS: " + rows.Length + " unified records in " + file);
     }
 
