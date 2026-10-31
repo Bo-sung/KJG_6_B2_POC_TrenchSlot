@@ -22,7 +22,7 @@ GameManager가 소유하므로 다른 게임 세션의 전역 상태를 참조�
 
 ## LogKit의 역할
 
-`LogKitBootstrap`은 기존 TelemetryData 설정을 읽어 LogKit v0.3.0을 구성한다.
+`LogKitBootstrap`은 기존 TelemetryData 설정을 읽어 LogKit v0.3.0을 구성한다. Preload 씬의 `PreloadController`에 설정한 프로필이 있으면 그 값이 Resources 설정을 덮어쓴다.
 LogKit은 Unity 콘솔·오류 수집과 해당 LogKit 파일의 선택적 전송을 담당한다.
 파일은 `Application.persistentDataPath/Logs`에 저장된다.
 콘솔 파일과 분석 파일은 목적이 다르며 게임 사건을 양쪽에 다시 기록하지 않는다.
@@ -31,10 +31,25 @@ LogKit은 Unity 콘솔·오류 수집과 해당 LogKit 파일의 선택적 전�
 분석 저장소를 대체하거나 서버 수집기를 연결하는 작업은 별도다. 이 변경에서는 분석 파일의 null·sequence·고빈도 관측·요약 revision 계약을 유지한다.
 
 - 게임 분석 활성화 및 버퍼: `Resources/LogData.json`.
-- LogKit 콘솔·서버 전송: `Resources/TelemetryData.json`.
-- 로컬 전송 설정: Git 제외 `Resources/TelemetryLocalData.json`의 명시 필드만 덮어쓴다.
+- LogKit 콘솔·서버 전송 기본값: `Resources/TelemetryData.json`.
+- 빌드 프로필: `Preload` 씬의 `PreloadController.telemetryProfile`이 `TelemetryData` 값을 덮어쓴다. `Awake`에서 적용되어 LogKit 로거 생성 전에 반영된다.
+- 로컬 전송 설정: Git 제외 `Resources/TelemetryLocalData.json`의 명시 필드만 덮어쓴다. Preload 프로필이 있으면 그 뒤에 Preload 값이 최종값이 된다.
 - 기존 `logShotEvents`, `logHitEvents`는 제거했다. 로컬 설정에 남은 항목은 무시된다.
-- 서버 주소·키를 저장소에 추가하지 않는다. 기본 uploadEnabled는 false다.
+- 실제 운영 서버 주소·키는 저장소에 추가하지 않는다. Preload 프로필의 기본값은 개발용 localhost/dev-log-key다.
+
+## Preload 빌드 프로필
+
+`Preload` 씬의 `PreloadController`는 `TelemetryProfile`을 직렬화 필드로 가진다. 여기서 LogKit 사용 여부, 콘솔 수집, flush/upload 주기, 개발/릴리스 서버 주소, API 키, 재전송, 타임아웃을 설정한다.
+
+적용 순서:
+1. `Resources/TelemetryData.json` 로드
+2. `Resources/TelemetryLocalData.json`가 있으면 덮어씀
+3. `PreloadController.Awake`에서 Preload 프로필 덮어씀 (최종값)
+4. `LogKitBootstrap.Apply`로 LogKit에 전달
+
+Preload 씬이 없거나 Title/Game 씬을 직접 플레이하면 1~2단계 값이 fallback으로 쓰인다. 빌드 프로필을 나누려면 프로필별 Preload 씬을 만들고 Unity Build Profile의 Scene List에서 해당 씬을 첫 번째로 지정한다.
+
+Preload 씬에 LogKit `GameLogger` 컴포넌트를 따로 두지 않는다. 별도 컴포넌트가 먼저 초기화되면 `RetryPendingUploads`가 프로필 적용 전 기본값으로 실행될 수 있다. 설정은 `PreloadController.telemetryProfile` 하나로 모은다.
 
 ## 사용자 Unity 검증
 
@@ -42,6 +57,7 @@ LogKit은 Unity 콘솔·오류 수집과 해당 LogKit 파일의 선택적 전�
 실제 게임에서 사격(산탄·조준·아킴보 포함), 헤드샷·헬멧·경직, 슬롯의 회복·현물 지급, 상점 구매 성공·실패, 무기 교체·획득, 사망·타이틀 복귀·재시작을 확인한다.
 보상·피해·반동이 동일하고, 재시작 시 분석 sessionId가 바뀌며 종료 뒤 해당 파일에 추가 기록이 없어야 한다.
 LogKit은 씬 재시작에도 한 인스턴스이고 콘솔 오류를 수집하는지 별도로 확인한다.
+Preload 씬의 `PreloadController` Inspector에 `TelemetryProfile` 값이 보이고, Play 시 해당 주소/키로 전송되는지 확인한다.
 서버 전송은 로컬 설정을 지정한 환경에서 확인한다.
 
 Play Mode를 종료한 뒤 `Tools > POC > Verify Unified Telemetry File`을 실행하면 가장 최근 분석 파일의 세션·sequence·종료·발사/탄 중복·요약 revision을 검사한다.

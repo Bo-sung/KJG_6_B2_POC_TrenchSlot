@@ -240,6 +240,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5fce16e62c68d14db934bb028db38cf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PreloadController
+  telemetryProfile:
+    profileName: Local
+    enabled: 1
+    captureUnityLogs: 1
+    flushIntervalSeconds: 5
+    uploadEnabled: 1
+    developmentServerUrl: http://localhost:5000/api/logs
+    releaseServerUrl: http://localhost:5000/api/logs
+    apiKey: dev-log-key
+    uploadIntervalSeconds: 5
+    retryPendingOnStartup: 1
+    requestTimeoutSeconds: 5
 --- !u!4 &54567024
 Transform:
   m_ObjectHideFlags: 0
