@@ -7,6 +7,10 @@ using Newtonsoft.Json.Linq;
 
 public sealed class LogGameLifecycle
 {
+    // 판 종료 때 서버 전송을 기다리는 시간(ms). 기본 3초는 게임 오버 화면을 멈추므로 1초로 줄인다.
+    // 못 보낸 항목은 다음 주기·다음 실행에서 재전송된다.
+    private const int FLUSH_TIMEOUT_MILLISECONDS = 1000;
+
     private readonly LogSession session;
     private readonly List<ILogSessionEndObserver> endObservers = new List<ILogSessionEndObserver>();
     private readonly Dictionary<string, ILogWaveSummaryCollector> collectors = new Dictionary<string, ILogWaveSummaryCollector>(StringComparer.Ordinal);
@@ -224,6 +228,8 @@ public sealed class LogGameLifecycle
             endObservers.Clear();
             waveOpen = false;
             session.Dispose();
+            // 판 기록이 LogKit 큐로 넘어간 뒤 바로 파일·서버로 보낸다(게임 오버 이후 종료가 늦어져도 항목이 남도록).
+            LogKit.GameLogger.FlushNow(FLUSH_TIMEOUT_MILLISECONDS);
         }
         return true;
     }

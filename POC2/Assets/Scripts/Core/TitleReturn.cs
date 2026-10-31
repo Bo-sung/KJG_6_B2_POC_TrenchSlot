@@ -10,7 +10,7 @@ public static class TitleReturn
     {
         Time.timeScale = 1f;
         _gameManager?.PrepareForTitleReturn();
-        GameLogger.FlushNow();
+        GameLogger.FlushNow(1000);
         SceneManager.LoadScene(SceneNames.TITLE);
     }
 }
