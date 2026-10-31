@@ -20,6 +20,9 @@ public sealed class GameConfigData
     public float crouchHeightRatio = 0.55f;
     public float crouchSpeedRatio = 0.5f;
     public float crouchCameraSmoothSeconds = 0.12f;
+    // 점프 최고 높이(m)와 전력 질주 속도 배율(앞으로 이동 시).
+    public float jumpHeight = 1.1f;
+    public float sprintSpeedRatio = 1.6f;
     public float damageDirectionHoldSeconds = 0.2f;
     public float damageDirectionFadeSeconds = 0.8f;
     // 조준 시 기본 카메라 시야각의 비율과 전환 시간(초).

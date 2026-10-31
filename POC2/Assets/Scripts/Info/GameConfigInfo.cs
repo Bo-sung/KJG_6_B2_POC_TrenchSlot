@@ -30,6 +30,8 @@ public static class GameConfigInfo
     public static float CrouchHeightRatio(GameConfigData _table) => _table != null && _table.crouchHeightRatio > 0f ? Mathf.Clamp(_table.crouchHeightRatio, 0.1f, 1f) : 0.55f;
     public static float CrouchSpeedRatio(GameConfigData _table) => _table != null && _table.crouchSpeedRatio > 0f ? Mathf.Clamp01(_table.crouchSpeedRatio) : 0.5f;
     public static float CrouchCameraSmoothSeconds(GameConfigData _table) => _table != null && _table.crouchCameraSmoothSeconds > 0f ? _table.crouchCameraSmoothSeconds : 0.12f;
+    public static float JumpHeight(GameConfigData _table) => _table != null && _table.jumpHeight > 0f ? _table.jumpHeight : 1.1f;
+    public static float SprintSpeedRatio(GameConfigData _table) => _table != null && _table.sprintSpeedRatio >= 1f ? Mathf.Min(_table.sprintSpeedRatio, 3f) : 1.6f;
     public static float DamageDirectionHoldSeconds(GameConfigData _table) => _table != null ? Mathf.Max(0f, _table.damageDirectionHoldSeconds) : 0.2f;
     public static float DamageDirectionFadeSeconds(GameConfigData _table) => _table != null && _table.damageDirectionFadeSeconds > 0f ? _table.damageDirectionFadeSeconds : 0.8f;
     public static float AimFovRatio(GameConfigData _table) => _table != null && _table.aimFovRatio > 0f ? Mathf.Clamp(_table.aimFovRatio, 0.1f, 1f) : 0.7f;

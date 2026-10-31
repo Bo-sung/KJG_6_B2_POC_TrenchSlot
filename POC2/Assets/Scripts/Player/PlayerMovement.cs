@@ -19,6 +19,8 @@ public sealed class PlayerMovement : MonoBehaviour
     private const float MAX_MOVE_DELTA_TIME = 0.05f;
     // 맵 아래로 떨어졌을 때 스폰 위치로 되돌리는 깊이.
     private const float FALL_RESET_DEPTH = 3f;
+    // 달리기는 앞으로(입력 y) 충분히 밀 때만 적용한다. 옆·뒤 이동은 걷기 속도다.
+    private const float SPRINT_FORWARD_THRESHOLD = 0.5f;
 
     private CharacterController controller;
     private float verticalSpeed;
@@ -38,7 +40,8 @@ public sealed class PlayerMovement : MonoBehaviour
         InputGate.PlayerEnabled && (health == null || health.IsAlive);
     // 이동속도 배율(이동속도 스탯 × 든 무기 무게). GameManager가 정한다.
     public float SpeedMultiplier { get; set; } = 1f;
-    public float CurrentMoveSpeed => moveSpeed * Mathf.Max(0f, SpeedMultiplier) * (IsCrouched ? GameConfigInfo.CrouchSpeedRatio(feedbackConfig) : 1f);
+    public bool IsSprinting { get; private set; }
+    public float CurrentMoveSpeed => moveSpeed * Mathf.Max(0f, SpeedMultiplier) * SpeedRatio();
 
     private void Awake()
     {
@@ -80,6 +83,7 @@ public sealed class PlayerMovement : MonoBehaviour
         if ((health != null && !health.IsAlive) || !InputGate.PlayerEnabled)
         {
             ResetRecoil();
+            IsSprinting = false;
             return;
         }
 
@@ -105,10 +109,43 @@ public sealed class PlayerMovement : MonoBehaviour
             verticalSpeed = 0f;
         }
 
+        // 웅크린 상태에서는 점프·달리기를 막는다. 점프는 바닥에 있을 때 누른 순간에만 나간다.
+        IsSprinting = !IsCrouched && input.y > SPRINT_FORWARD_THRESHOLD && IsSprintHeld();
+        if (!IsCrouched && controller.isGrounded && IsJumpPressed())
+        {
+            verticalSpeed = JumpVelocity();
+        }
+
         verticalSpeed -= gravity * Time.deltaTime;
         Vector3 velocity = (transform.right * input.x + transform.forward * input.y) * CurrentMoveSpeed;
         velocity.y = verticalSpeed;
         controller.Move(velocity * Time.deltaTime);
+    }
+
+    private float SpeedRatio()
+    {
+        if (IsCrouched) return GameConfigInfo.CrouchSpeedRatio(feedbackConfig);
+        if (IsSprinting) return GameConfigInfo.SprintSpeedRatio(feedbackConfig);
+        return 1f;
+    }
+
+    // v = sqrt(2·g·h): 설정한 최고 높이에 닿는 초기 상승 속도.
+    private float JumpVelocity()
+    {
+        return Mathf.Sqrt(2f * Mathf.Max(0f, gravity) * GameConfigInfo.JumpHeight(feedbackConfig));
+    }
+
+    // 입력 액션(Player/Jump: Space·패드 A, Player/Sprint: 왼쪽 Shift·왼쪽 스틱 누르기)과 같은 키를 직접 읽는다.
+    private static bool IsJumpPressed()
+    {
+        return (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame);
+    }
+
+    private static bool IsSprintHeld()
+    {
+        return (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed)
+            || (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed);
     }
 
     // 반동은 마우스 입력과 분리된 일시적 시점 오프셋이다. 발사마다 누적되고 자연히 0으로 돌아간다.
