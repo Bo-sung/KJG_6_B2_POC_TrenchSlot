@@ -26,6 +26,12 @@ public sealed partial class ShopPresenter : MonoBehaviour
         weapons = tables.Weapon;
         ammoTable = tables.Ammo;
         CheckRowCounts();
+        // 첫 상점 표시에서 이미지를 읽고 GPU에 올리느라 끊기지 않도록 판매 무기 이미지를 미리 읽어 둔다.
+        foreach (var offer in shop.weapons)
+        {
+            var entry = offer != null ? WeaponInfo.Find(weapons, offer.weaponId) : null;
+            WeaponIconInfo.Find(entry?.modelId);
+        }
 
         view.WeaponSelected += OnWeaponSelected;
         view.WeaponBuyClicked += OnWeaponBuyClicked;

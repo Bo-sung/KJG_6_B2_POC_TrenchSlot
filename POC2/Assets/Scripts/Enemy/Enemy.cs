@@ -15,6 +15,8 @@ public sealed class Enemy : MonoBehaviour, IDamageable
     private const string BASE_COLOR_PROPERTY = "_BaseColor";
     // 피격 반응: 몸이 잠깐 흰색으로 번쩍인다. 처치 시에는 앞으로 쓰러진다.
     private const float HIT_FLASH_SECONDS = 0.08f;
+    // 적이 든 무기 표시 배율. 1.6배면 총신과 개머리가 한눈에 구분된다.
+    private const float HELD_WEAPON_SCALE = 1.6f;
     private const float FALL_ANGLE = 80f;
     // 총구가 없는 레거시 프리팹만 쓰는 기하학 폴백. 조준은 실제 CharacterController 중심을 쓴다.
     private const float FALLBACK_MUZZLE_HEIGHT = 1.4f;
@@ -927,8 +929,11 @@ public sealed class Enemy : MonoBehaviour, IDamageable
         }
         foreach (Transform model in weaponMount)
         {
-            model.gameObject.SetActive(model.name == _weaponId);
-            if (model.gameObject.activeSelf)
+            bool shown = model.name == _weaponId;
+            model.gameObject.SetActive(shown);
+            // 어떤 무기를 드는지 멀리서도 알아보도록 켜진 총만 키운다(프리팹 원본 스케일 1 기준).
+            model.localScale = shown ? Vector3.one * HELD_WEAPON_SCALE : Vector3.one;
+            if (shown)
             {
                 activeMuzzle = model.Find("Muzzle");
             }

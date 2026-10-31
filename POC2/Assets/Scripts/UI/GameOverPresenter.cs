@@ -37,9 +37,6 @@ public sealed class GameOverPresenter : MonoBehaviour
     private void OnTitleClicked()
     {
         SoundPlayer.Play(SfxType.Click);
-        gameManager.PrepareForTitleReturn();
-        // 메인 메뉴로 넘어가기 전에 쌓인 로그를 서버로 보낸다.
-        LogKit.GameLogger.FlushNow();
-        SceneManager.LoadScene(SceneNames.TITLE);
+        TitleReturn.Go(gameManager);
     }
 }

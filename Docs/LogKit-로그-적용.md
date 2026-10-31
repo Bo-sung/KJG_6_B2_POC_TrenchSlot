@@ -2,10 +2,8 @@
 
 ## 기록 경로와 책임
 
-게임 분석 기록은 `LogSession` → `FileLogStore` 한 경로로 기록한다.
-파일은 `Application.persistentDataPath/Telemetry/{sessionId}.jsonl`이다.
+**[2026-10-31 스캔 개정]** 게임 분석 기록은 `LogSession` → `LogKitStore` 한 경로다. 과거 `FileLogStore`(persistentDataPath/Telemetry/{sessionId}.jsonl, 판별 파일)는 커밋 da15dea에서 제거됐고, 분석 줄은 `GameLogger.Data("Info","GameEvent",eventType,JSON)`로 LogKit에 합류한다. 물리적 파일은 LogKit이 소유 — `persistentDataPath/Logs/{LogKit세션ID}.jsonl`에 콘솔 수집과 **한 파일 혼합 기록**이며, 파일 경계는 앱 실행(LogKit 세션) 단위다. 게임 sessionId는 파일명이 아니라 각 레코드의 sessionId 필드로만 남고, 분석 레코드의 sequence·FixedUpdate 누적 시간은 LogSession 값 유지.
 `LogGameLifecycle`이 세션·웨이브·사망을 관리하고 `LogCombatCollector`가 발사·적중·실제 피해·장비 사용 시간을 집계한다.
-세션 ID, sequence, FixedUpdate 누적 시간은 모두 이 시스템 값을 사용한다.
 
 기존 `GameTelemetry`의 별도 runId, Time.time 시계, Run/Wave/Combat/Player 이벤트 및 Count/Measure 호출은 제거했다.
 게임 오버의 이중 종료와 투사체 적중의 이중 집계도 제거했다.
@@ -22,20 +20,18 @@ GameManager가 소유하므로 다른 게임 세션의 전역 상태를 참조�
 
 ## LogKit의 역할
 
-`LogKitBootstrap`은 기존 TelemetryData 설정을 읽어 LogKit v0.3.0을 구성한다. Preload 씬의 `PreloadController`에 설정한 프로필이 있으면 그 값이 Resources 설정을 덮어쓴다.
-LogKit은 Unity 콘솔·오류 수집과 해당 LogKit 파일의 선택적 전송을 담당한다.
+`LogKitBootstrap`은 기존 TelemetryData 설정을 읽어 LogKit **v0.6.0**(Git 태그 참조, 커밋 efc8f13)을 구성한다. Preload 씬의 `PreloadController`에 설정한 프로필이 있으면 그 값이 Resources 설정을 덮어쓴다.
+LogKit은 Unity 콘솔·오류 수집과 파일 보관·서버 전송을 담당한다.
 파일은 `Application.persistentDataPath/Logs`에 저장된다.
-콘솔 파일과 분석 파일은 목적이 다르며 게임 사건을 양쪽에 다시 기록하지 않는다.
+[2026-10-31 개정] 콘솔 수집과 게임 분석(GameEvent)은 **같은 LogKit 파일에 혼합 기록**된다. 분석 줄은 `GameLogger.Data("Info","GameEvent",eventType,JSON)` — eventType은 message, JSON 줄 전체는 dataJson에 들어간다.
 
-**분석 JSONL은 LogKit 업로드 대상에 자동으로 포함되지 않는다.**
-분석 저장소를 대체하거나 서버 수집기를 연결하는 작업은 별도다. 이 변경에서는 분석 파일의 null·sequence·고빈도 관측·요약 revision 계약을 유지한다.
+**[2026-10-31 개정] 분석 이벤트는 LogKit 전송 대상에 포함된다.** LogKitStore로 넘겨진 줄은 LogKit 파일에 보관되고 주기/종료 전송(FlushNow는 메인 타이머 차단 우회 즉시 전송) 대상이 된다. 저장된 `TelemetryData.json`의 uploadEnabled=false가 기본이지만, 저장소에 커밋된 `Resources/TelemetryLocalData.json`이 uploadEnabled=true와 개발 서버 주소(`http://172.21.10.67:5000/api/logs`)로 덮어쓴다.
 
 - 게임 분석 활성화 및 버퍼: `Resources/LogData.json`.
 - LogKit 콘솔·서버 전송 기본값: `Resources/TelemetryData.json`.
 - 빌드 프로필: `Preload` 씬의 `PreloadController.telemetryProfile`이 `TelemetryData` 값을 덮어쓴다. `Awake`에서 적용되어 LogKit 로거 생성 전에 반영된다.
-- 로컬 전송 설정: Git 제외 `Resources/TelemetryLocalData.json`의 명시 필드만 덮어쓴다. Preload 프로필이 있으면 그 뒤에 Preload 값이 최종값이 된다.
+- 로컬 전송 설정: `Resources/TelemetryLocalData.json`의 명시 필드만 덮어쓴다. **Git 제외 계획과 달리 현재 저장소에 커밋돼 있다** — uploadEnabled=true, 서버 주소 `http://172.21.10.67:5000/api/logs`(dev 키 별도 커밋 2fdae95). 저장소에 주소가 노출되어 있으므로 "주소·키는 저장소에 추가하지 않는다"는 원칙은 현행 위반 상태다. Preload 프로필이 있으면 그 뒤에 Preload 값이 최종값이 된다.
 - 기존 `logShotEvents`, `logHitEvents`는 제거했다. 로컬 설정에 남은 항목은 무시된다.
-- 실제 운영 서버 주소·키는 저장소에 추가하지 않는다. Preload 프로필의 기본값은 개발용 localhost/dev-log-key다.
 
 ## Preload 빌드 프로필
 
@@ -60,8 +56,8 @@ LogKit은 씬 재시작에도 한 인스턴스이고 콘솔 오류를 수집하�
 Preload 씬의 `PreloadController` Inspector에 `TelemetryProfile` 값이 보이고, Play 시 해당 주소/키로 전송되는지 확인한다.
 서버 전송은 로컬 설정을 지정한 환경에서 확인한다.
 
-Play Mode를 종료한 뒤 `Tools > POC > Verify Unified Telemetry File`을 실행하면 가장 최근 분석 파일의 세션·sequence·종료·발사/탄 중복·요약 revision을 검사한다.
-기존 구형 지표 전용 자동 플레이 검증기는 통합 파일 검사기로 교체했다. 이 메뉴는 게임을 실행하거나 씬을 변경하지 않는다.
+Play Mode를 종료한 뒤 상점 로그는 `POC > Verify Shop Telemetry`(PocShopLogVerification), 입력 경로는 `POC > Verify Shop UI (Play)` 끝의 텔레메트리 검사로 확인한다.
+과거 `Tools/POC/Verify Unified Telemetry File`(PocTelemetryVerification)은 LogKitStore 전환(da15dea)과 함께 **제거**됐다 — 로컬 파일 기반 검사기가 LogKit 파일 구조와 맞지 않기 때문. 이 메뉴는 게임을 실행하거나 씬을 변경하지 않았다.
 파일 검사만으로 실제 보상·피해의 정확성까지 입증하지는 않으므로 위 게임플레이 확인이 필요하다.
 
 ## Unity 외부 회귀 검사
@@ -81,6 +77,7 @@ Play Mode를 종료한 뒤 `Tools > POC > Verify Unified Telemetry File`을 실�
 7차에서 LogShopCollector의 offerSetId/revision·구매 attemptId/결과·실제 생성/효과·탄약 원본 참조를 구현했다.
 유료 회복은 현행 상점/API에 없어 복원하지 않았다. 실제 표시 행·스크롤 범위와 직접 API 호출을 구분한다.
 7차 순수 검사 100개와 통합 회귀 330개가 통과했다. 상세는 `Docs/로그-시스템-7차-계약.md` 참조.
-8차에서 전체 순수 수집기와 실제 FileLogStore를 연결한 통합 검사·파일 읽기 검사·운영 자료를 추가했다.
-현재 요구사항 대응표·파일 해석·실제 Unity 사용자 확인표는 `Docs/로그-시스템-운영-검증.md`, 대표 합성 출력은 `Docs/로그-시스템-8차.synthetic.jsonl`이다.
-위 단계별 결과는 각 차수 당시 기록이며, 8차의 현재 소스 재실행 결과는 `.omo/verification/log-phase8/RESULTS.md`를 기준으로 본다. 실제 Unity 확인은 사용자 대기다.
+8차에서 전체 순수 수집기와 실제 저장(FileLogStore, 현 LogKitStore의 전신)을 연결한 통합 검사·파일 읽기 검사·운영 자료를 추가했다.
+현재 요구사항 대응표·파일 해석·실제 Unity 사용자 확인표는 `Docs/로그-시스템-운영-검증.md`, 대표 합성 출력은 `Docs/로그-시스템-8차.synthetic.jsonl`이었다.
+위 단계별 결과는 각 차수 당시 기록이며, 8차의 현재 소스 재실행 결과는 `.omo/verification/log-phase8/RESULTS.md`를 기준으로 봤다. 실제 Unity 확인은 사용자 대기다.
+**[2026-10-31 스캔] 참조 산출물 실재 확인**: `Docs/로그-시스템-운영-검증.md`·`로그-시스템-6차/7차-계약.md`·각 synthetic.jsonl·`.omo/verification/*`는 현재 저장소에 **존재하지 않는다**(gitignore 또는 미커밋). 문서 참조는 읽기 전용 배경으로만 유효.
