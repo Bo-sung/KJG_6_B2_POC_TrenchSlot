@@ -75,6 +75,15 @@ public sealed class HudView : MonoBehaviour
         SetDamageDirection(0f, 0f);
     }
 
+    // 채움 바는 스프라이트 없이 사각형으로 두고, 너비(anchorMax.x)를 비율만큼 줄여 표시한다.
+    // Image.fillAmount는 스프라이트가 없으면 적용되지 않아 바가 줄지 않으므로 쓰지 않는다.
+    private static void SetFillRatio(Image _fill, float _ratio)
+    {
+        if (_fill == null) return;
+        var rect = _fill.rectTransform;
+        rect.anchorMax = new Vector2(Mathf.Clamp01(_ratio), rect.anchorMax.y);
+    }
+
     public void SetCrosshairVisible(bool _visible)
     {
         if (crosshair != null) crosshair.enabled = _visible;
@@ -93,7 +102,7 @@ public sealed class HudView : MonoBehaviour
     {
         healthText.text = $"HP {Mathf.CeilToInt(_current)} / {Mathf.CeilToInt(_max)}";
         float ratio = _max > 0f ? Mathf.Clamp01(_current / _max) : 0f;
-        healthFill.fillAmount = ratio;
+        SetFillRatio(healthFill, ratio);
         bool low = ratio <= LOW_HEALTH_RATIO;
         healthFill.color = low ? LOW_HEALTH_COLOR : healthBaseColor;
         healthText.color = low ? LOW_HEALTH_COLOR : Color.white;
@@ -127,7 +136,7 @@ public sealed class HudView : MonoBehaviour
         if (timerFill != null)
         {
             float ratio = _total > 0f ? Mathf.Clamp01(_left / _total) : (_left > 0f ? 1f : 0f);
-            timerFill.fillAmount = ratio;
+            SetFillRatio(timerFill, ratio);
         }
     }
 
